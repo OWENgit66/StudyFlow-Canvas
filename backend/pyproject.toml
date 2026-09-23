@@ -1,0 +1,25 @@
+[project]
+name = "studyflow-backend"
+version = "0.1.0"
+description = "StudyFlow FastAPI backend"
+requires-python = ">=3.12"
+dynamic = ["dependencies"]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.in"]}
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+filterwarnings = [
+    "error",
+    # Starlette 1.6 uses this deprecated AnyIO alias internally.
+    "ignore:The anyio.abc.BlockingPortal alias is deprecated.*:DeprecationWarning:starlette.testclient",
+]

@@ -1,0 +1,8 @@
+# Direct dependencies. requirements.txt pins the resolved environment.
+fastapi>=0.115,<1.0
+uvicorn>=0.30,<1.0
+sqlalchemy>=2.0,<2.1
+pydantic>=2.9,<3
+pydantic-settings>=2.0,<3
+httpx2>=2.13,<3
+pymupdf>=1.24,<2

@@ -1,0 +1,98 @@
+# Secrets and local configuration
+.env*
+*.env
+*.env.*
+!.env.example
+!*.env.example
+secrets/
+.secrets/
+credentials.json
+credentials.local.*
+*.token
+
+# JavaScript
+node_modules/
+.next/
+out/
+.npm-cache/
+*.tsbuildinfo
+next-env.d.ts
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+pytest-cache-files-*/
+.ruff_cache/
+*.egg-info/
+
+# Local data and generated output
+data/*
+!data/.gitkeep
+materials/*
+!materials/.gitkeep
+# Downloaded documents remain private even when copied outside materials/.
+*.pdf
+*.pptx
+*.ppt
+*.docx
+*.doc
+.studyflow-staging/
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+*.log
+coverage/
+.coverage
+dist/
+build/
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Private live-validation evidence; retain locally, never publish course content
+/docs/screenshots/
+/docs/phase-3-live-verification.md
+/docs/phase-7-acceptance.md
+/docs/phase-4-verification.md
+/docs/phase-4-1-quality.md
+/docs/phase-5-1-verification.md
+/docs/phase-5-2-verification.md
+/docs/phase-5-3-verification.md
+/docs/phase-5-4-verification.md
+/docs/materials.md
+/docs/phase-7-interface.md
+/docs/sync-workflow.md
+
+# Additional local credentials, reports and scratch files
+*.pem
+*.key
+*.p12
+*.pfx
+.cache/
+.mypy_cache/
+.tox/
+htmlcov/
+test-results/
+playwright-report/
+*.tmp
+*.bak
+*.orig
+*.rej
+*.swp
+*.swo
+*~
+tmp/
+temp/
+
+# Windows launcher state and runtime logs
+.runtime/
+logs/

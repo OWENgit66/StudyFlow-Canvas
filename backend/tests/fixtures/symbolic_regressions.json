@@ -1,0 +1,44 @@
+[
+  {
+    "source": {
+      "source_chunk_id": 1,
+      "resource_id": 1,
+      "page_number": 1,
+      "chunk_index": 0,
+      "content": "Synthetic layout test: A \uf0c5 B. The operator is unreadable.",
+      "warnings": [
+        "suspicious_formula_layout"
+      ]
+    },
+    "example": {
+      "source_chunk_ids": [
+        1
+      ],
+      "source_pages": [
+        1
+      ],
+      "description": "The expression is A \u2295 B."
+    }
+  },
+  {
+    "source": {
+      "source_chunk_id": 2,
+      "resource_id": 1,
+      "page_number": 2,
+      "chunk_index": 1,
+      "content": "Synthetic layout test: Result = ... = 7. Intermediate symbols are missing.",
+      "warnings": [
+        "suspicious_formula_layout"
+      ]
+    },
+    "example": {
+      "source_chunk_ids": [
+        2
+      ],
+      "source_pages": [
+        2
+      ],
+      "description": "Result = ... = 7."
+    }
+  }
+]
