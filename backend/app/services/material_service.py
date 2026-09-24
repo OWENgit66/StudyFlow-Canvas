@@ -10,8 +10,10 @@ from app.services.canvas_service import CanvasService
 from app.services.material_paths import MaterialContext, database_path, resolve_database_path
 
 
-def download_resource(db: Session, canvas: CanvasService, resource: Resource):
-    if not resource.canvas_file_id:
+def download_resource(db: Session, canvas: CanvasService, resource: Resource, *, external_file=None):
+    if external_file is not None and (resource.canvas_file_id is not None or resource.external_source_key != external_file.source_key):
+        raise CanvasDownloadError('External material identity mismatch.')
+    if not resource.canvas_file_id and external_file is None:
         raise CanvasDownloadError("Resource has no Canvas file ID.")
     db.flush()
     existing = None
@@ -24,7 +26,8 @@ def download_resource(db: Session, canvas: CanvasService, resource: Resource):
     course = week.course
     semester = course.semester
     context = MaterialContext(semester.year, semester.term, course.code, course.name, week.title)
-    path = canvas.download_file(resource.canvas_file_id, context=context, existing_path=existing)
+    path = (canvas.download_external_file(external_file, context=context, existing_path=existing)
+            if external_file is not None else canvas.download_file(resource.canvas_file_id, context=context, existing_path=existing))
     resource.local_path = database_path(path)
     resource.sync_status = ResourceStatus.downloaded
     db.flush()

@@ -11,6 +11,7 @@ export interface ParsingHealth {
   issues: { page_number: number; category: string; label: string; explanation: string; severity: "info" | "warning" | "critical"; occurrences: number }[];
 }
 export interface Resource {
+  resource_type: "lecture" | "tutorial" | "other";
   id: number; week_id: number; canvas_file_id: number | null; filename: string; file_type: string;
   sync_status: "pending" | "downloaded" | "parsed" | "processing" | "completed" | "failed";
   file_available: boolean; size_bytes: number | null;

@@ -40,6 +40,7 @@ HTTP 使用项目现有 httpx2（兼容 httpx 风格接口），从测试依赖�
 - `get_modules(course_id)`：保留原始 module name、position、workflow_state，不猜测周编号。
 - `get_module_items(course_id, module_id)`：保留 type、title、content_id；File 类型暴露 canvas_file_id。其他类型（包括未知类型）正常返回。
 - `get_files(course_id)`：读取课程文件列表。
+- `get_page(course_id, page_url_or_id)`：通过官方 API 读取 Page HTML；Page 课件发现、去重和外部 PDF 安全限制见 [Page-linked materials](page-materials.md)。
 - `get_file(file_id)`：读取独立文件 metadata，规范化 `content-type` 与 `url` 为 content_type、download_url。
 - `download_file(file_id, context=...)`：重新获取 metadata，再下载，返回保存文件的 Path。
 

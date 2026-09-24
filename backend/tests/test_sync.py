@@ -394,9 +394,10 @@ def test_legacy_week_adoption_and_course_metadata_update(db,sync_setup):
     assert week.canvas_module_id==51 and course.code=='COMP' and course.name=='Networks'
 
 
-def test_non_file_module_items_are_ignored(db,sync_setup):
+@pytest.mark.parametrize('kind', ['Assignment', 'Quiz', 'ExternalUrl', 'ExternalTool', 'Discussion', 'SubHeader'])
+def test_non_material_module_items_are_ignored(db,sync_setup,kind):
     canvas=sync_setup[1]
-    canvas.get_module_items.side_effect=lambda c,m:[CanvasModuleItem(id=1,module_id=m,title='Page',type='Page',content_id=201)]
+    canvas.get_module_items.side_effect=lambda c,m:[CanvasModuleItem(id=1,module_id=m,title=kind,type=kind,content_id=201)]
     result=run(db,sync_setup)
     assert result.status=='completed' and result.files_discovered==0
     canvas.get_file.assert_not_called()

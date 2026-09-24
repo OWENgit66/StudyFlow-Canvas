@@ -23,6 +23,12 @@ class Settings(BaseSettings):
     storage_path: Path = Path("data/files")
     materials_root: Path = Path("materials")
     sync_semester_id: int | None = Field(default=None, gt=0)
+    material_ignore_readings: bool = True
+    # Literal, pipe-separated phrases; not user-supplied regular expressions.
+    material_core_terms: str = 'lecture|lecture slides|slides|tutorial|workshop|lab|practical|seminar'
+    material_reading_terms: str = ('reading|required reading|recommended reading|supplementary reading|'
+                                 'supplementary material|article|research paper|paper|journal article|'
+                                 'book chapter|reference|further reading|additional reading|optional reading')
 
     @field_validator('sync_semester_id', mode='before')
     @classmethod

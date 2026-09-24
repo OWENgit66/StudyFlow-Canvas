@@ -19,6 +19,17 @@ def upgrade_sync_columns(engine):
         if 'resources' in inspector.get_table_names() and 'parsing_report' not in {
                 c['name'] for c in inspector.get_columns('resources')}:
             connection.exec_driver_sql('ALTER TABLE resources ADD COLUMN parsing_report JSON')
+        if 'resources' in inspector.get_table_names():
+            columns = {c['name'] for c in inspector.get_columns('resources')}
+            if 'resource_type' not in columns:
+                connection.exec_driver_sql("ALTER TABLE resources ADD COLUMN resource_type VARCHAR(8) "
+                                           "NOT NULL DEFAULT 'other' "
+                                           "CHECK (resource_type IN ('lecture', 'tutorial', 'other'))")
+            for name in ('external_source_key', 'external_revision'):
+                if name not in columns:
+                    connection.exec_driver_sql(f'ALTER TABLE resources ADD COLUMN {name} VARCHAR(64)')
+            connection.exec_driver_sql('CREATE UNIQUE INDEX IF NOT EXISTS uq_resource_external_source '
+                                       'ON resources (external_source_key)')
         if 'semesters' in inspector.get_table_names():
             columns = {c['name'] for c in inspector.get_columns('semesters')}
             for name, definition in [('is_active', 'BOOLEAN NOT NULL DEFAULT 0'), ('canvas_term_id', 'INTEGER')]:

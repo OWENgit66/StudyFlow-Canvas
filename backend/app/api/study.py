@@ -75,6 +75,7 @@ def resources(week_id: ID, db: DB, root: Annotated[Path, Depends(get_material_ro
             path, size = None, None
         result.append(StudyResource(id=resource.id, week_id=resource.week_id,
             canvas_file_id=resource.canvas_file_id, filename=resource.filename, file_type=resource.file_type,
+            resource_type=resource.resource_type,
             sync_status=resource.sync_status, file_available=path is not None, size_bytes=size,
             parsing_health=read_health(resource, root)))
     return result

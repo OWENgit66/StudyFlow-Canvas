@@ -156,6 +156,9 @@ select { border: 1px solid #c7d1c6; background: transparent; border-radius: 5px;
 .answer[hidden] { display: none; }
 .resource-list { border-top: 1px solid var(--line); }
 .resource-row { display: flex; align-items: flex-start; gap: 16px; padding: 23px 0; border-bottom: 1px solid var(--line); }
+.resource-type { display: inline-block; margin: 6px 0; padding: 2px 8px; border-radius: 5px; font-size: 12px; font-weight: 600; color: #475569; background: #f1f5f9; }
+.resource-type-lecture { color: #1e40af; background: #eff6ff; }
+.resource-type-tutorial { color: #166534; background: #f0fdf4; }
 .file-icon { width: 36px; height: 43px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border: 1px solid #c9d3c4; border-radius: 3px 9px 3px 3px; font-size: 22px; color: #6c856c; }
 .resource-info { flex: 1; min-width: 0; }
 .resource-info h3 { font-size: 14px; margin-bottom: 5px; }

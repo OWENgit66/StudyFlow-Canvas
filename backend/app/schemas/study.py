@@ -2,7 +2,7 @@
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models.common import ResourceStatus, SyncStatus
+from app.models.common import ResourceStatus, ResourceType, SyncStatus
 from app.schemas.course import CourseRead
 from app.schemas.semester import SemesterRead
 from app.schemas.parsing_health import ParsingHealth
@@ -78,6 +78,7 @@ class StudyResource(BaseModel):
     canvas_file_id: int | None
     filename: str
     file_type: str
+    resource_type: ResourceType = ResourceType.other
     sync_status: ResourceStatus
     file_available: bool
     size_bytes: int | None

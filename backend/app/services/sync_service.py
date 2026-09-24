@@ -1,7 +1,9 @@
 """Synchronous single-worker orchestration; all external IO stays in existing services."""
 from copy import deepcopy
+from dataclasses import replace
 import logging
 from pathlib import Path
+from urllib.parse import unquote, urlsplit
 from threading import Event, Lock
 
 from sqlalchemy import delete, select
@@ -13,6 +15,10 @@ from app.services.document_processing import process_resource
 from app.services.material_service import download_resource
 from app.services.material_paths import resolve_database_path
 from app.services.semester_scope import exclusion_reason
+from app.services.page_materials import MaterialLink, extract_material_links
+from app.services.external_pdf import ExternalPDFError
+from app.services.material_classification import Classification, MaterialClassifier, MaterialKind, combine
+from app.services.material_classification import resource_role_evidence, classify_resource_type
 
 logger = logging.getLogger(__name__)
 _sync_lock = Lock()  # MVP requires one backend worker; background work stays in-process.
@@ -54,6 +60,7 @@ class SyncService:
     def __init__(self, settings, canvas_factory, documents, knowledge, ai_factory):
         self.settings, self.canvas_factory = settings, canvas_factory
         self.documents, self.knowledge, self.ai_factory = documents, knowledge, ai_factory
+        self.material_classifier = MaterialClassifier(settings)
 
     def reserve(self, db, request, *, dry_run=False):
         global _active_sync_id
@@ -63,6 +70,11 @@ class SyncService:
             semester, selected_course = repository.select_semester(db, request, self.settings.sync_semester_id)
             record = SyncRecord(details={'dry_run': dry_run, 'scope': request.model_dump(),
                 'files_parsed': 0, 'files_analyzed': 0, 'files_checked': 0, 'events': [], 'errors': [], 'usage': {},
+                'pages_inspected': 0, 'pages_loaded': 0, 'page_links_found': 0,
+                'page_linked_files_discovered': 0, 'page_files_resolved': 0,
+                'page_links_unsupported': 0, 'page_links_unresolved': 0, 'page_warnings': [],
+                'core_materials_discovered': 0, 'reading_materials_discovered': 0,
+                'ignored_reading_materials': 0, 'unknown_materials': 0,
                 'progress': {'stage': 'discovery', 'processing': False, 'updated_at': utc_now().isoformat()},
                 'discovery_complete': False, 'cancel_requested': False})
             db.add(record)
@@ -81,7 +93,7 @@ class SyncService:
             record_id = record.id
             semester, selected_course = repository.select_semester(db, request, self.settings.sync_semester_id)
             logger.info('Starting Canvas sync %d', record_id)
-            seen = set()
+            seen = {}  # Identity -> first discovery context, shared with pending entries.
             pending = []  # Discover the selected scope before processing; no external queue.
             try:
                 self._checkpoint()
@@ -135,11 +147,12 @@ class SyncService:
                     record.details = {**record.details, 'discovery_complete': True,
                                       'discovery_incomplete': bool(record.details['errors'])}
                     self._save(db, record)
-                    for week_id, file_id, context in pending:
+                    for week_id, link, context in pending:
                         self._progress(db, record, 'checking', **context, processing=True,
                                        steps={step: 'pending' for step in PIPELINE}, batch=None, batches=None,
                                        parsing_review_pages=None)
-                        self._file(db, record, canvas, db.get(Week, week_id) if week_id else None, file_id, dry_run)
+                        self._file(db, record, canvas, db.get(Week, week_id) if week_id else None,
+                                   link.canvas_file_id, dry_run, external_url=link.external_url)
                     self._checkpoint()
                     record.status = SyncStatus.completed_with_errors if record.details['errors'] else SyncStatus.completed
             except SyncCancelled:
@@ -215,32 +228,110 @@ class SyncService:
                 continue
             for item in items:
                 self._checkpoint()
-                file_id = item.canvas_file_id
-                if not file_id or (request.file_id and file_id != request.file_id):
-                    continue
-                found_target = True
-                if file_id in seen:
-                    continue  # One canonical resource even when linked from multiple modules.
-                seen.add(file_id)
-                record.files_discovered += 1
-                self._save(db, record)
-                pending.append((week.id if week else None, file_id, dict(course_id=remote.canvas_course_id,
-                    course_code=remote.course_code, course_name=remote.name, module_id=module.module_id,
-                    module=module.name, filename=item.title, resource_id=None, canvas_file_id=file_id)))
+                links = self._item_links(db, record, canvas, remote.canvas_course_id, module.module_id, item)
+                for link in links:
+                    file_id = link.canvas_file_id
+                    if request.file_id and file_id != request.file_id:
+                        continue
+                    found_target = True
+                    via_page = item.type == 'Page'
+                    material_context = dict(
+                        item_title=item.title, module_title=module.name, page_title=link.page_title,
+                        link_text=link.link_text, nearby_text=link.surrounding_text,
+                        filename=unquote(urlsplit(link.external_url).path.rsplit('/', 1)[-1]) if link.external_url else '')
+                    decision = self.material_classifier.classify(**material_context)
+                    role_evidence = resource_role_evidence(**material_context)
+                    previous = seen.get(link.key)
+                    if via_page and (previous is None or not previous['linked_from_page']):
+                        self._detail_count(record, 'page_linked_files_discovered')
+                    if previous is not None:
+                        previous['role_evidence'] = sorted(set(map(tuple, previous['role_evidence'])) | set(role_evidence))
+                        previous['resource_type'] = classify_resource_type(previous['role_evidence']).value
+                        merged = combine(self._context_classification(previous), decision)
+                        previous.update(material_classification=merged.kind.value,
+                                        classification_reasons=list(merged.reasons))
+                        if via_page:
+                            previous['linked_from_page'] = True
+                            if not previous['source_page_title']:
+                                previous['source_page_title'] = link.page_title or item.title
+                        continue  # Shared Canvas IDs or external URL hashes are processed once.
+                    context = dict(course_id=remote.canvas_course_id, course_code=remote.course_code,
+                        course_name=remote.name, module_id=module.module_id, module=module.name,
+                        filename=link.link_text.strip() or item.title, resource_id=None, canvas_file_id=file_id,
+                        discovered_via='page' if via_page else 'file', linked_from_page=via_page,
+                        source_page_title=(link.page_title or item.title) if via_page else None,
+                        material_classification=decision.kind.value, classification_reasons=list(decision.reasons),
+                        role_evidence=role_evidence,
+                        resource_type=classify_resource_type(role_evidence).value,
+                        external_source_key=link.key[1] if link.external_url else None)
+                    seen[link.key] = context
+                    record.files_discovered += 1
+                    self._save(db, record)
+                    pending.append((week.id if week else None, link, context))
         if request.file_id and not found_target:
             self._error(db, record, 'discovery', file_id=request.file_id, course_id=remote.canvas_course_id)
 
-    def _file(self, db, record, canvas, week, file_id, dry_run):
+    def _item_links(self, db, record, canvas, course_id, module_id, item):
+        if item.canvas_file_id:
+            return [MaterialLink(canvas_file_id=item.canvas_file_id)]
+        if item.type != 'Page':
+            return []
+        self._detail_count(record, 'pages_inspected')
+        self._save(db, record)
+        try:
+            page = canvas.get_page(course_id, item.page_url or item.content_id)
+            self._detail_count(record, 'pages_loaded')
+            links, unsupported = extract_material_links(page.body, self.settings.canvas_base_url, course_id, page.url)
+            for _ in links:
+                self._detail_count(record, 'page_links_found')
+            if unsupported:
+                details = deepcopy(record.details)
+                details['page_links_unsupported'] += len(unsupported)
+                details['page_warnings'].append(dict(course_id=course_id, module_id=module_id,
+                    page_item_id=item.item_id, source_page_title=item.title,
+                    reason='unsupported_or_unresolved_links', count=len(unsupported)))
+                record.details = details
+            self._save(db, record)
+            return [replace(link, page_title=page.title) for link in links]
+        except SyncCancelled:
+            raise
+        except Exception:
+            db.rollback()
+            self._error(db, record, 'page', course_id=course_id, module_id=module_id, page_item_id=item.item_id)
+            return []
+
+    def _file(self, db, record, canvas, week, file_id, dry_run, *, external_url=None):
         resource_id, stage = None, 'discovery'
         failed_usage = None
         try:
             self._progress(db, record, 'checking', resource_id=None)
             self._step(db, record, 'discovery', 'current')
-            metadata = canvas.get_file(file_id)
-            resource = repository.find_resource(db, file_id)
+            decision = self._context_classification(record.details['progress'])
+            # Explicit reading context is enough to skip even a locked/broken link.
+            # No metadata fetch, Resource mutation, download, parsing or AI is needed.
+            if decision.kind == MaterialKind.READING and self.settings.material_ignore_readings:
+                self._record_material_classification(db, record, decision)
+                self._ignore_reading(db, record, file_id)
+                return
+            metadata = canvas.get_external_file(external_url) if external_url else canvas.get_file(file_id)
+            decision = combine(decision, self.material_classifier.classify(
+                filename=metadata.filename, display_name=getattr(metadata, 'display_name', None)))
+            self._progress(db, record, 'checking', filename=metadata.filename)
+            self._record_material_classification(db, record, decision)
+            if decision.kind == MaterialKind.READING and self.settings.material_ignore_readings:
+                self._ignore_reading(db, record, file_id)
+                return
+            if getattr(metadata, 'locked_for_user', False):
+                raise ValueError('Material is locked.')
+            if record.details['progress'].get('linked_from_page') and not external_url:
+                self._detail_count(record, 'page_files_resolved')
+            resource = repository.find_resource(db, file_id, external_source_key=metadata.source_key if external_url else None)
             resource_id = resource.id if resource else None
             classification = repository.classify(resource, metadata)
-            self._progress(db, record, 'checking', filename=metadata.filename, resource_id=resource_id)
+            resource_type = classify_resource_type(record.details['progress'].get('role_evidence', ()),
+                filename=metadata.filename, display_name=getattr(metadata, 'display_name', None))
+            self._progress(db, record, 'checking', filename=metadata.filename, resource_id=resource_id,
+                           resource_type=resource_type.value)
             self._event(db, record, file_id, resource_id, 'discovery', classification)
             if dry_run:
                 self._detail_count(record, 'files_checked')
@@ -249,6 +340,9 @@ class SyncService:
                 record.details = {**record.details, 'progress': {**record.details['progress'], 'processing': False}}
                 self._save(db, record)
                 return
+            if resource is not None:
+                repository.update_resource_type(db, resource, resource_type)
+                db.commit()
             if classification == 'UNCHANGED' and resource.sync_status == ResourceStatus.completed:
                 record.files_skipped += 1
                 self._event(db, record, file_id, resource_id, 'skip', 'UNCHANGED')
@@ -259,6 +353,8 @@ class SyncService:
                 return
             if resource is None:
                 resource = Resource(week_id=week.id, canvas_file_id=file_id,
+                    resource_type=resource_type,
+                    external_source_key=metadata.source_key if external_url else None,
                     filename=metadata.filename, file_type=Path(metadata.filename).suffix.lower().lstrip('.') or 'unknown',
                     sync_stage='download')
                 db.add(resource)
@@ -287,10 +383,16 @@ class SyncService:
                 db.commit()
                 if resource.local_path and not resolve_database_path(resource.local_path).is_file():
                     raise ValueError('Missing existing material requires explicit recovery.')
-                download_resource(db, canvas, resource)
+                if external_url:
+                    download_resource(db, canvas, resource, external_file=metadata)
+                else:
+                    download_resource(db, canvas, resource)
                 resource.filename = metadata.filename
                 resource.file_type = Path(metadata.filename).suffix.lower().lstrip('.') or 'unknown'
-                resource.canvas_updated_at = metadata.updated_at
+                if external_url:
+                    resource.external_revision = metadata.revision
+                else:
+                    resource.canvas_updated_at = metadata.updated_at
                 resource.sync_stage = 'parse' if resource.file_type == 'pdf' else 'unsupported'
                 db.commit()
                 record.files_downloaded += 1
@@ -344,7 +446,7 @@ class SyncService:
                 record.details = {**record.details, 'usage': failed_usage}
                 self._save(db, record)
             raise
-        except Exception:
+        except Exception as error:
             # Never log exception text, provider bodies, prompts or signed URLs.
             db.rollback()
             if resource_id and stage in {'download', 'parse', 'knowledge'}:
@@ -357,9 +459,32 @@ class SyncService:
                 details['usage'] = failed_usage
                 record.details = details
             record.files_failed += 1
+            if stage == 'discovery' and record.details.get('progress', {}).get('linked_from_page'):
+                self._detail_count(record, 'page_links_unresolved')
+                if isinstance(error, ExternalPDFError):
+                    self._detail_count(record, 'page_links_unsupported')
             failed_step = record.details.get('progress', {}).get('stage', stage)
             self._error(db, record, failed_step if failed_step in PIPELINE else stage,
                         file_id=file_id, resource_id=resource_id)
+
+    @staticmethod
+    def _context_classification(context):
+        return Classification(MaterialKind(context.get('material_classification', 'UNKNOWN')),
+                              tuple(context.get('classification_reasons', ())))
+
+    def _record_material_classification(self, db, record, decision):
+        counter = {MaterialKind.CORE: 'core_materials_discovered',
+                   MaterialKind.READING: 'reading_materials_discovered',
+                   MaterialKind.UNKNOWN: 'unknown_materials'}[decision.kind]
+        self._detail_count(record, counter)
+        self._progress(db, record, 'checking', material_classification=decision.kind.value,
+                       classification_reasons=list(decision.reasons))
+
+    def _ignore_reading(self, db, record, file_id):
+        self._detail_count(record, 'ignored_reading_materials')
+        self._detail_count(record, 'files_checked')
+        record.files_skipped += 1
+        self._event(db, record, file_id, None, 'skip', 'ignored_reading_material')
 
     @staticmethod
     def _detail_count(record, key):
@@ -383,8 +508,11 @@ class SyncService:
 
     def _event(self, db, record, file_id, resource_id, stage, outcome):
         details = deepcopy(record.details)
-        details['events'].append(dict(file_id=file_id, resource_id=resource_id, stage=stage, outcome=outcome))
         progress = details.get('progress', {})
+        details['events'].append(dict(file_id=file_id, resource_id=resource_id, stage=stage, outcome=outcome,
+            **{key: progress.get(key) for key in ('filename', 'course_id', 'module_id', 'discovered_via',
+                                                 'linked_from_page', 'source_page_title', 'external_source_key',
+                                                 'module', 'material_classification', 'classification_reasons', 'resource_type')}))
         steps = progress.get('steps', {})
         completed_step = {'discovery': 'discovery', 'download': 'download', 'parse': 'parse', 'knowledge': 'persistence'}.get(stage)
         if completed_step:
@@ -394,13 +522,13 @@ class SyncService:
         details['progress'] = {**progress, 'steps': steps,
                                'processing': False if stage in {'skip', 'knowledge'} else progress.get('processing', False)}
         record.details = details
-        logger.info('Sync %d file %d resource %s: %s -> %s', record.id, file_id, resource_id, stage, outcome)
+        logger.info('Sync %d file %s resource %s: %s -> %s', record.id, file_id, resource_id, stage, outcome)
         self._save(db, record)
 
     def _error(self, db, record, stage, **identity):
         details = deepcopy(record.details)
         current = details.get('progress', {})
-        if identity.get('file_id'):
+        if identity.get('file_id') or current.get('external_source_key'):
             failed_step = stage if stage in PIPELINE else 'discovery'
             details['progress'] = {**current, 'processing': False,
                                    'steps': {**current.get('steps', {}), failed_step: 'failed'}}

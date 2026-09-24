@@ -1,1239 +1,1098 @@
-你现在是我的 **Senior Full-Stack Engineer + AI Engineer + Software Architect**。
+# StudyFlow — AI Development Instructions
 
-我要你帮助我从 0 开始设计并实现一个完整的个人项目，项目暂定名：
+This file defines the development rules for AI coding agents working on
+StudyFlow.
 
-# StudyFlow
-
-这是一个面向大学生的 **AI 自动课程学习平台**。
-
-它的核心目标是：
-
-> 自动从 Canvas LMS 获取我的课程课件，按照 Semester → Course → Week 进行整理，解析 PDF/PPTX/DOCX 内容，使用 AI 提炼知识点，并最终通过一个结构清晰、漂亮、方便学习的网页进行展示。
-
-我希望最终这个项目不仅能够自己使用，也可以作为我的 AI Application / Full-Stack / RAG Portfolio Project。
+All coding agents must read and follow this file before modifying the
+repository.
 
 ---
 
-# 一、核心 Workflow
+# 1. Project Vision
 
-系统的整体流程应该是：
+StudyFlow is a personal AI-powered university learning system.
 
-Canvas LMS
+Its purpose is to transform university course materials into a structured,
+searchable and source-grounded learning environment.
 
-↓
+StudyFlow should help the user:
 
-获取当前 Semester 的 Courses
+- automatically sync course materials from Canvas LMS
+- organize materials by semester, course and week/module
+- understand lecture concepts
+- learn from tutorials and worked examples
+- preserve original slide/page context
+- identify document parsing problems
+- ask questions grounded in original course materials
+- always trace generated knowledge back to its source
 
-↓
-
-读取每门课程的 Modules / Weeks
-
-↓
-
-读取其中的 Files / Lecture Slides / Tutorials
-
-↓
-
-检查哪些文件是新增的或已经更新
-
-↓
-
-下载文件到本地 Storage
-
-↓
-
-解析 PDF / PPTX / DOCX
-
-↓
-
-提取文字、标题、页码、表格等信息
-
-↓
-
-按照合理长度切分 Document Chunks
-
-↓
-
-调用 LLM 分析课件
-
-↓
-
-生成结构化知识
-
-↓
-
-存入数据库
-
-↓
-
-在网页中按照：
-
-Semester
-→ Course
-→ Week
-→ Resource
-→ Knowledge
-
-进行展示。
+StudyFlow is not intended to be a generic LMS or social learning platform.
 
 ---
 
-# 二、MVP 范围
+# 2. Current Project Status
 
-请不要一开始过度设计。
+## StudyFlow V1 — COMPLETE / STABLE
 
-第一版 MVP 只需要支持：
+V1 already provides:
 
-1. 单用户
-2. 一个 Semester
-3. 多门 Course
-4. Canvas API 获取课程
-5. Canvas Modules 获取 Week
-6. Canvas Files 下载课件
-7. PDF 解析
-8. AI 自动总结
-9. SQLite 数据库
-10. 网页 Dashboard
-11. Course 页面
-12. Week 页面
-13. 原始课件查看/下载
-14. 手动点击 “Sync Canvas” 开始同步
+Canvas LMS integration
 
-第一版暂时不要实现：
+→ active-semester filtering
 
-* 多用户系统
-* 手机 App
-* 微服务
-* Redis
-* Kafka
-* Kubernetes
-* 复杂权限系统
-* 社交功能
-* 自动部署集群
-* 复杂知识图谱
+→ incremental material sync
 
-先保证完整 Workflow 可以真正运行。
+→ human-readable materials storage
 
----
+→ PDF parsing
 
-# 三、推荐技术栈
+→ page-level extraction
 
-除非你发现有明显更合理的方案，否则优先使用：
+→ document chunking
 
-## Frontend
+→ parsing-quality warnings
 
-Next.js
-TypeScript
-Tailwind CSS
+→ LLM structured knowledge extraction
 
-## Backend
+→ source/chunk provenance validation
 
-Python
-FastAPI
+→ formula and symbolic safety filtering
 
-## Database
+→ semantic grounding
 
-MVP：
+→ SQLite persistence
 
-SQLite
+→ course / week learning interface
 
-后续：
+→ source-page links
 
-PostgreSQL
+→ parsing-health UI
 
-## Document Parsing
+→ Canvas sync progress UI
 
-PDF：
+→ local Windows launcher
 
-PyMuPDF
+V1 should now be treated as a stable foundation.
 
-后续支持：
+Do not redesign or rewrite V1 architecture unless:
 
-python-pptx
-python-docx
+1. a reproducible bug exists, or
+2. a V2 requirement genuinely requires a small backward-compatible change.
 
-## AI
-
-设计一个统一：
-
-LLMService
-
-不要把整个项目和某一家模型 API 强绑定。
-
-应该方便以后更换：
-
-OpenAI
-Gemini
-Claude
-Local Model
-
-## Canvas
-
-优先使用 Canvas REST API。
-
-创建：
-
-CanvasService
-
-负责：
-
-get_courses()
-
-get_modules()
-
-get_module_items()
-
-get_files()
-
-download_file()
-
-不要一开始使用 Selenium 或 Playwright。
-
-只有当 Canvas API 无法完成某个功能时才考虑 Browser Automation。
+Prefer extending V1 over replacing it.
 
 ---
 
-# 四、建议项目架构
+# 3. StudyFlow V2 Goals
 
-项目建议采用：
+V2 extends StudyFlow in four major directions.
 
-studyflow/
+## 3.1 Resource Classification
 
-frontend/
+Course resources should be classified into learning roles such as:
 
-backend/
+- lecture
+- tutorial
+- lab
+- workshop
+- reading
+- other
 
-data/
+The initial V2 implementation should prioritize:
 
-docs/
+- lecture
+- tutorial
+- other
 
-README.md
-
-backend 内建议：
-
-app/
-
-api/
-
-services/
-
-models/
-
-schemas/
-
-repositories/
-
-core/
-
-utils/
-
-services 至少包含：
-
-CanvasService
-
-DocumentService
-
-AIService
-
-SyncService
-
-KnowledgeService
+Do not introduce unnecessary resource categories before they are needed.
 
 ---
 
-# 五、数据库设计
+## 3.2 Visual Course Material
 
-至少设计这些实体：
+PDF pages may contain important information that cannot be represented
+reliably as extracted text.
 
-Semester
+Examples:
 
-Course
+- flow diagrams
+- architecture diagrams
+- protocol diagrams
+- charts
+- timelines
+- tables
+- mathematical layouts
+- annotated figures
 
-Week
+V2 should preserve page-level visual context.
+
+The intended model is approximately:
 
 Resource
+→ DocumentPage
+→ DocumentChunk
+
+DocumentPage may contain:
+
+- resource_id
+- page_number
+- cleaned_text
+- screenshot_path
+- parsing warnings
+- has_visual
+- visual metadata
+
+The original slide/page remains the source of truth.
+
+AI-generated visual descriptions must never replace the original slide.
+
+---
+
+## 3.3 Lecture and Tutorial Separation
+
+Lecture and Tutorial resources have different educational roles.
+
+Lecture materials should focus on:
+
+- concepts
+- definitions
+- theory
+- architecture
+- processes
+- formulas
+- key ideas
+
+Tutorial materials should focus on:
+
+- problems
+- exercises
+- worked examples
+- solution steps
+- techniques
+- common mistakes
+- practice
+
+Do not process Lecture and Tutorial resources with identical knowledge
+extraction prompts once V2 separation is implemented.
+
+---
+
+## 3.4 Retrieval-Augmented Generation
+
+V2 will introduce RAG.
+
+The first RAG implementation must be:
+
+# Course-scoped RAG
+
+Example:
+
+User opens COMP9121
+
+→ asks a question
+
+→ retrieval searches only COMP9121
+
+→ relevant DocumentChunks are retrieved
+
+→ LLM answers using only retrieved course material
+
+→ answer contains source references
+
+Do not begin with global cross-university retrieval.
+
+Course-level retrieval must work reliably first.
+
+---
+
+# 4. RAG Source of Truth
+
+RAG must retrieve from:
 
 DocumentChunk
 
-Summary
+and original course material.
 
-Concept
+Do NOT use AI-generated summaries as the primary retrieval source.
 
-Question
-
-SyncRecord
-
-建议关系：
-
-Semester
-
-↓
-
-Course
-
-↓
-
-Week
-
-↓
-
-Resource
-
-↓
-
-DocumentChunk
-
-同时 Week 可以关联：
-
-Summary
-
-Concept
+Correct architecture:
 
 Question
+→ query embedding
+→ DocumentChunk retrieval
+→ source validation
+→ LLM answer
+→ citations
 
-Course 至少包含：
+Incorrect architecture:
 
-id
+Question
+→ search AI summary
+→ answer
 
-canvas_course_id
-
-code
-
-name
-
-semester_id
-
-Week 至少包含：
-
-id
-
-course_id
-
-week_number
-
-title
-
-Resource 至少包含：
-
-id
-
-canvas_file_id
-
-week_id
-
-filename
-
-file_type
-
-local_path
-
-canvas_updated_at
-
-sync_status
-
-DocumentChunk 至少包含：
-
-id
-
-resource_id
-
-page_number
-
-chunk_index
-
-content
-
-Concept 至少包含：
-
-id
-
-week_id
-
-resource_id
-
-name
-
-definition
-
-explanation
-
-importance
-
-source_page
-
-Summary 至少包含：
-
-id
-
-week_id
-
-overview
-
-key_points
-
-exam_focus
-
-Question 至少包含：
-
-id
-
-week_id
-
-question
-
-answer
-
-source_page
-
-请根据实际工程需要进一步优化 schema。
+AI-generated Summary / Concept / TutorialKnowledge may be used as
+secondary metadata but not as the primary source of truth.
 
 ---
 
-# 六、AI Knowledge Engine
+# 5. RAG Citations
 
-不要简单让 LLM 输出一篇长文章。
+Every RAG answer should preserve source attribution whenever possible.
 
-LLM 应该返回严格的结构化 JSON。
+Example:
 
-例如：
-
-{
-"topic": "Time Management",
-
-"overview": "本周主要介绍……",
-
-"concepts": [
-{
-"name": "Critical Path",
-"definition": "...",
-"explanation": "...",
-"importance": "high",
-"source_pages": [15,16]
-}
-],
-
-"key_points": [
-"...",
-"..."
-],
-
-"formulas": [
-{
-"formula": "EF = ES + Duration",
-"explanation": "...",
-"source_page": 20
-}
-],
-
-"examples": [],
-
-"exam_focus": [],
-
-"questions": [
-{
-"question": "...",
-"answer": "...",
-"source_page": 18
-}
-]
-}
-
-必须：
-
-1. 使用 schema validation
-2. 处理 LLM JSON 输出错误
-3. 尽量保存知识点对应的 source page
-4. 不允许 AI 编造课件中不存在的知识
-5. 如果课件没有相关信息，应明确为空
-
----
-
-# 七、网页设计
-
-我希望网页是一个：
-
-Clean / Modern / Academic / Minimal
-
-风格的学习 Dashboard。
-
-不要做成传统后台管理系统。
-
-首页 Dashboard 应该显示：
-
-StudyFlow
-
-Current Semester
-
-Courses
-
-例如：
-
-COMPXXXX
-Computer Networks
-
-Progress: 5 / 13 Weeks
-
-Latest:
-Week 5 – Network Layer
-
-进入课程：
-
-COMPXXXX
-
-Week 01
-Introduction
-
-Week 02
-Link Layer
-
-Week 03
-CRC
+Answer
 
 ...
 
-点击 Week：
+Sources:
 
-应该展示：
+Lecture Week 2
+Page 21
 
-Week Title
+Tutorial Week 2
+Page 4
 
-Overview
+The user should be able to open the original material.
 
-Key Concepts
+Never invent:
 
-Key Points
+- page numbers
+- resource names
+- chunk IDs
+- citations
 
-Formulas
+Source IDs returned by the model must be validated against actual
+retrieved chunks.
 
-Examples
+---
 
-Exam Focus
+# 6. V2 Development Order
 
-Practice Questions
+V2 must be developed incrementally.
+
+Follow this order unless there is a strong technical reason not to.
+
+## V2.1 — Resource Classification
+
+Implement:
+
+lecture
+tutorial
+other
+
+Then expand only when required.
+
+---
+
+## V2.2 — DocumentPage and Visual Preservation
+
+Add page-level representation.
+
+Support:
+
+- page screenshot generation
+- page text
+- parsing warnings
+- visual flag
+
+Do not introduce Vision AI yet unless explicitly requested.
+
+---
+
+## V2.3 — Separate Lecture / Tutorial Knowledge Pipelines
+
+Lecture:
+
+- concepts
+- theory
+- definitions
+- formulas
+- architecture
+
+Tutorial:
+
+- problems
+- examples
+- solutions
+- steps
+- mistakes
+
+---
+
+## V2.4 — Embeddings and Vector Retrieval
+
+Create embeddings from DocumentChunks.
+
+Do not embed AI-generated summaries as the primary knowledge source.
+
+Metadata should include enough information to filter by:
+
+- course
+- week
+- resource
+- resource_type
+- page
+
+---
+
+## V2.5 — Course RAG
+
+Implement:
+
+Ask this course
+
+with:
+
+- retrieval
+- grounded generation
+- source citations
+
+---
+
+## V2.6 — Multimodal RAG
+
+Only after text RAG works reliably.
+
+For visually important retrieved pages:
+
+DocumentChunk
++
+DocumentPage screenshot
+
+→ Vision-capable model
+
+→ answer
+
+Do not send every course page to a Vision model by default.
+
+---
+
+# 7. Current Technology Stack
+
+Unless a strong reason exists, preserve the current stack.
+
+Frontend:
+
+- Next.js
+- TypeScript
+- Tailwind CSS
+
+Backend:
+
+- Python
+- FastAPI
+
+Current database:
+
+- SQLite
+
+V2 may migrate to:
+
+- PostgreSQL
+- pgvector
+
+but only when the RAG/vector phase actually requires it.
+
+Do not migrate databases early merely because pgvector may be useful
+later.
+
+Document Processing:
+
+- PyMuPDF
+
+AI:
+
+- LLMProvider abstraction
+- OpenAIProvider
+- DeepSeekProvider
+
+Do not tightly couple StudyFlow business logic to one AI vendor.
+
+---
+
+# 8. Provider Abstraction
+
+AI features must use the existing provider abstraction.
+
+Business services should not directly instantiate vendor clients.
+
+Correct:
+
+KnowledgeService
+→ LLMProvider
+
+RAGService
+→ LLMProvider
+
+Incorrect:
+
+KnowledgeService
+→ direct DeepSeek SDK calls
+
+Provider switching should remain configuration-driven.
+
+---
+
+# 9. Canvas Responsibilities
+
+CanvasService is responsible for:
+
+- Canvas API communication
+- authentication
+- course discovery
+- module discovery
+- file discovery
+- page retrieval
+- file metadata
+- downloads
+
+CanvasService must NOT:
+
+- parse PDFs
+- generate AI knowledge
+- create embeddings
+- answer RAG questions
+
+Keep service boundaries clear.
+
+---
+
+# 10. Canvas Pages
+
+Some courses place lecture materials inside Canvas Pages rather than
+direct File Module Items.
+
+StudyFlow should support:
+
+Module
+→ Page
+→ Canvas-hosted course file
+→ existing Resource pipeline
+
+Prefer resolving Page-linked Canvas files to their canonical Canvas File
+object.
+
+Use canvas_file_id when available.
+
+Do not create duplicate Resources when the same file appears:
+
+- directly in a Module
+- inside a Canvas Page
+- in multiple Pages
+
+---
+
+# 11. Reading Material Filtering
+
+Supplementary reading materials should not be processed by default.
+
+Examples:
+
+- Required Reading
+- Recommended Reading
+- Journal Article
+- Research Paper
+- Book Chapter
+- Further Reading
+- Supplementary Reading
+
+Classify materials where practical as:
+
+CORE_MATERIAL
+READING_MATERIAL
+UNKNOWN
+
+Default:
+
+CORE_MATERIAL
+→ process
+
+READING_MATERIAL
+→ ignore intentionally
+
+UNKNOWN
+→ handle conservatively and report
+
+Do not count intentionally ignored reading materials as failures.
+
+Use context such as:
+
+- filename
+- Module Item title
+- Canvas Page title
+- surrounding link text
+
+Do not classify solely by file extension.
+
+---
+
+# 12. Semester Scope
+
+Normal Canvas sync should process only the active semester.
+
+Filtering should occur BEFORE expensive module/file/page processing.
+
+Historical courses may remain in the database.
+
+Historical materials should not be automatically deleted.
+
+Do not hard-code a semester throughout the codebase.
+
+Use one centralized active-semester source of truth.
+
+---
+
+# 13. Document Parsing Safety
+
+Existing V1 parsing safeguards must remain.
+
+Preserve:
+
+- page numbers
+- parsing warnings
+- formula-layout warnings
+- unreadable symbol detection
+- scanned-page detection
+- source provenance
+
+Never guess missing formulas or unreadable symbols.
+
+The original PDF remains authoritative.
+
+---
+
+# 14. DocumentPage Rules
+
+V2 page screenshots must:
+
+- correspond to the correct Resource
+- preserve human-readable page numbering
+- be generated deterministically
+- remain linked to the original PDF page
+
+Avoid duplicating full PDF files unnecessarily.
+
+Screenshot storage should be configurable and organized.
+
+Do not commit generated private slide screenshots to Git.
+
+---
+
+# 15. Visual Processing Rules
+
+Do not automatically call a Vision model for every page.
+
+Preferred strategy:
+
+PDF
+→ deterministic extraction
+→ page screenshot
+→ visual detection
+→ only selected pages use Vision when required
+
+Use expensive AI only when it adds meaningful value.
+
+---
+
+# 16. Embedding Rules
+
+Embeddings should represent original DocumentChunk content.
+
+Each embedding must remain traceable to:
+
+- chunk_id
+- resource_id
+- page_number
+- course
+- week/module
+- resource_type
+
+Store the embedding model/version.
+
+If embedding models change, the system should be able to identify stale
+embeddings.
+
+---
+
+# 17. Vector Search
+
+Do not mix retrieval logic directly into API route handlers.
+
+Use a dedicated abstraction such as:
+
+RetrievalService
+
+or equivalent existing architecture.
+
+Responsibilities:
+
+Query
+→ embedding
+→ metadata filtering
+→ vector search
+→ ranked chunks
+
+Generation belongs elsewhere.
+
+---
+
+# 18. Course RAG Rules
+
+Initial RAG must default to one Course.
+
+Example:
+
+course_id = 12
+
+Search only that course.
+
+Future global search may be added later.
+
+Do not silently search unrelated courses unless the UI clearly requests
+cross-course search.
+
+---
+
+# 19. Lecture / Tutorial Retrieval
+
+Resource type should become retrieval metadata.
+
+Initial retrieval may search both.
+
+Future ranking may prioritize:
+
+Concept questions
+→ Lecture
+
+Problem-solving questions
+→ Tutorial
+
+Do not implement complex intent classification before basic RAG works.
+
+---
+
+# 20. Hallucination and Grounding
+
+Existing V1 grounding principles remain mandatory.
+
+LLMs must not be trusted to invent:
+
+- facts
+- formulas
+- citations
+- page numbers
+- source IDs
+
+RAG output must use only supplied retrieved material.
+
+If evidence is insufficient:
+
+the system should say that the available course material does not provide
+enough evidence.
+
+Do not answer from general model knowledge while pretending it came from
+the course.
+
+---
+
+# 21. Frontend V2 Information Architecture
+
+Keep the existing hierarchy:
+
+Dashboard
+→ Course
+→ Week / Module
+
+Within a Week:
+
+Lecture
+Tutorial
+Resources
+
+should become visibly separate where data exists.
+
+Example:
+
+Week 5
+
+Lecture
+- Overview
+- Concepts
+- Slide visuals
+- Formulas
+
+Tutorial
+- Exercises
+- Worked examples
+- Solutions
 
 Original Materials
 
-例如：
+Ask StudyFlow
 
-Key Concepts
-
-CRC
-
-Definition:
-...
-
-Explanation:
-...
-
-Importance:
-★★★★★
-
-Source:
-Lecture Week 2 – Page 32
-
-用户点击 Source 后以后可以跳到原 PDF 页。
+Do not overload the main Dashboard with low-level information.
 
 ---
 
-# 八、Sync Canvas
+# 22. Parsing Health UI
 
-网页中应该有：
+Keep the existing progressive disclosure model.
 
-Sync Canvas
+Dashboard:
+no detailed parsing warnings
 
-按钮。
+Course:
+week/resource aggregate status
 
-点击后：
+Week:
+resource health
 
-Frontend
+Resource review:
+exact pages and warning types
 
-↓
-
-POST /api/sync
-
-↓
-
-SyncService
-
-↓
-
-CanvasService
-
-↓
-
-获取课程
-
-↓
-
-获取 Modules
-
-↓
-
-获取 Files
-
-↓
-
-检查 Canvas File ID
-
-↓
-
-检查 updated_at
-
-↓
-
-如果没有变化：
-Skip
-
-如果是新文件：
-Download
-
-如果发生更新：
-Replace
-
-↓
-
-DocumentService
-
-↓
-
-AIService
-
-↓
-
-Database
-
-↓
-
-Frontend Refresh
-
-必须实现同步日志，例如：
-
-INFO6007 Week 3 Lecture
-
-Downloaded
-
-↓
-
-Parsed
-
-↓
-
-AI Processing
-
-↓
-
-Completed
-
-如果失败：
-
-Failed
-
-并记录错误原因。
+This behavior should not regress.
 
 ---
 
-# 九、非常重要：增量同步
+# 23. Sync Progress UI
 
-不要每一次 Sync 都重新分析所有课件。
+Keep current live sync progress features.
 
-应该通过：
+The user should be able to see:
 
-canvas_file_id
+- current course
+- current module
+- current resource
+- current processing stage
+- overall progress
+- completed
+- skipped
+- failed
+- processing
 
-*
+Do not regress to a static:
 
-canvas_updated_at
+"Syncing Canvas..."
 
-或其他可靠信息判断文件是否发生变化。
-
-如果：
-
-Canvas 文件没有变化
-
-则：
-
-Skip download
-Skip parsing
-Skip AI analysis
-
-避免浪费时间和 LLM API Token。
+message.
 
 ---
 
-# 十、配置和 Secrets
+# 24. V1 Backward Compatibility
 
-Canvas Token
+V2 migrations must preserve:
 
-LLM API Key
+- existing Resources
+- existing DocumentChunks
+- current Knowledge
+- Canvas file identity
+- source page links
+- stale/current knowledge behavior
+- materials paths
 
-Database URL
+Do not destroy V1 user data during migrations.
 
-等信息必须放：
+If a destructive migration is genuinely necessary:
 
-.env
-
-并提供：
-
-.env.example
-
-例如：
-
-CANVAS_BASE_URL=
-
-CANVAS_ACCESS_TOKEN=
-
-LLM_PROVIDER=
-
-OPENAI_API_KEY=
-
-DATABASE_URL=
-
-禁止：
-
-把 Token
-
-API Key
-
-Password
-
-写进 Git Repository。
+stop and explain before executing it.
 
 ---
 
-# 十一、错误处理
+# 25. Database Migrations
 
-系统必须考虑：
+V2 introduces more persistent structures.
 
-Canvas API timeout
+Do not casually delete and recreate the database.
 
-Canvas token invalid
+Use proper migration strategy when schema changes become meaningful.
 
-文件下载失败
+Before migrations:
 
-PDF 无法解析
+inspect current schema and existing data.
 
-PDF 没有文本
-
-LLM API timeout
-
-LLM 返回错误 JSON
-
-数据库错误
-
-AI Rate Limit
-
-某个文件失败不能导致整个 Sync 任务全部崩溃。
-
-应该：
-
-记录错误
-
-继续处理其他文件
-
-最后给出 Sync Summary。
-
-例如：
-
-Sync Completed
-
-Courses: 4
-
-Files discovered: 26
-
-New: 3
-
-Updated: 1
-
-Skipped: 22
-
-Failed: 1
+Protect user data.
 
 ---
 
-# 十二、未来 RAG
+# 26. Secrets
 
-MVP 完成之后，再增加：
+Never hard-code or commit:
 
-Embedding
+- Canvas tokens
+- DeepSeek API keys
+- OpenAI API keys
+- database credentials
 
-Vector Database
+Use environment variables.
 
-Semantic Search
-
-RAG Chat
-
-目标是让我可以问：
-
-“CRC 是什么？”
-
-系统自动：
-
-Query
-
-↓
-
-Embedding
-
-↓
-
-搜索 DocumentChunks
-
-↓
-
-找到：
-
-COMPXXXX
-
-Week 2
-
-Lecture
-
-Page 32–38
-
-↓
-
-LLM
-
-↓
-
-回答
-
-并显示：
-
-Sources
-
-COMPXXXX
-Week 2 Lecture
-Page 32–38
-
-未来 Vector Database 可以考虑：
-
-pgvector
-
-但是 MVP 阶段不要急着加入。
+Never log full secrets.
 
 ---
 
-# 十三、未来功能
+# 27. Private University Content
 
-基础系统完成后可以逐步增加：
+Do not commit:
 
-Global Search
+- downloaded course PDFs
+- screenshots of private course materials
+- extracted private course content
+- SQLite databases containing course text
+- private validation reports
 
-RAG Chat
-
-Flashcards
-
-Quiz Generator
-
-Revision Mode
-
-Exam Mode
-
-Knowledge Graph
-
-Learning Progress
-
-Bookmarks
-
-Notes
-
-Dark Mode
-
-Study Statistics
-
-例如：
-
-AI 自动根据本周知识点生成：
-
-5 Multiple Choice Questions
-
-3 Short Answer Questions
-
-2 Calculation Questions
+Keep `.gitignore` protections intact.
 
 ---
 
-# 十四、代码质量要求
+# 28. Before Modifying Code
 
-代码应该：
+Every task must begin by:
 
-模块化
+1. Read AGENTS.md.
+2. Inspect repository structure.
+3. Inspect relevant existing files.
+4. Check whether functionality already exists.
+5. Review relevant tests.
+6. Plan the smallest compatible change.
 
-易读
-
-可维护
-
-有合理注释
-
-遵循 Python / TypeScript 最佳实践
-
-不要把所有代码写在一个文件。
-
-Service、Database、API、Schema 要合理分层。
-
-避免：
-
-God Class
-
-巨大函数
-
-大量重复代码
-
-Hard-coded configuration
+Do not assume the repository is empty.
 
 ---
 
-# 十五、README
+# 29. Engineering Workflow
 
-项目必须最终包含完整 README：
+For every task:
 
-1. Project Introduction
-2. Features
-3. Architecture
-4. Tech Stack
-5. Project Structure
-6. Installation
-7. Environment Variables
-8. Canvas Setup
-9. LLM Setup
-10. Running Backend
-11. Running Frontend
-12. Screenshots
-13. API Overview
-14. Future Roadmap
+Understand
 
-目标是让我以后可以把这个项目直接放到 GitHub Portfolio。
+→ Inspect
 
----
+→ Plan
 
-# 十六、开发方式
+→ Implement
 
-你不是只给我代码示例。
+→ Run
 
-你的任务是：
+→ Test
 
-真正把这个项目完成。
+→ Fix
 
-如果你拥有文件操作、Terminal、Git 或 Coding Agent 能力：
+→ Verify
 
-请直接：
+Never mark code complete merely because it was written.
 
-创建文件夹
-
-创建文件
-
-安装依赖
-
-编写代码
-
-运行代码
-
-检查错误
-
-修复错误
-
-运行测试
-
-而不是每一步都让我手动复制代码。
+When execution tools are available, actually run the implementation.
 
 ---
 
-# 十七、开发阶段
+# 30. Do Not Duplicate Services
 
-严格按照以下阶段开发：
+Before creating new:
 
-Phase 1
+- services
+- schemas
+- models
+- components
+- utilities
 
-Project Setup
+check whether the responsibility already exists.
 
-完成：
+Avoid:
 
-frontend
+service_v2.py
+new_service.py
+service_fixed.py
 
-backend
-
-.gitignore
-
-.env.example
-
-README
-
-基础运行环境
+Extend existing architecture when practical.
 
 ---
 
-Phase 2
+# 31. Testing
 
-Database
+New V2 functionality must include tests.
 
-完成：
+Automated tests must not rely on:
 
-Semester
+- real Canvas credentials
+- paid DeepSeek/OpenAI calls
+- private course files
 
-Course
+Use:
 
-Week
+- mocks
+- fixtures
+- temporary files
+- test databases
 
-Resource
-
-DocumentChunk
-
-Summary
-
-Concept
-
-Question
-
-SyncRecord
-
-并测试数据库连接。
+Real integration testing should occur only after automated tests pass.
 
 ---
 
-Phase 3
+# 32. Paid AI Calls
 
-Canvas Integration
+Do not make real paid AI requests during ordinary automated testing.
 
-完成：
+Before a real provider test:
 
-CanvasService
-
-能够：
-
-获取 Courses
-
-获取 Modules
-
-获取 Module Items
-
-获取 Files
-
-下载文件
-
-先写测试程序验证 Canvas API。
+1. automated tests must pass
+2. scope the test to one resource/query
+3. avoid repeated paid calls
+4. report usage when available
 
 ---
 
-Phase 4
+# 33. Performance and Cost
 
-Document Parser
+Avoid unnecessary AI usage.
 
-先实现：
+Examples:
 
-PDF parsing
+Do not:
 
-输出：
+- re-embed unchanged chunks
+- re-run Vision on unchanged pages
+- re-analyze unchanged resources
+- regenerate knowledge unnecessarily
 
-page_number
+Use content identity/version information.
 
-text
-
-metadata
-
-然后实现 chunking。
-
----
-
-Phase 5
-
-AI Knowledge Engine
-
-实现：
-
-AIService
-
-结构化 JSON Output
-
-Schema Validation
-
-生成：
-
-Overview
-
-Concepts
-
-Key Points
-
-Formulas
-
-Exam Focus
-
-Questions
+Incremental processing is a core StudyFlow principle.
 
 ---
 
-Phase 6
+# 34. Error Isolation
 
-Sync Pipeline
+One failed Resource or Page should not destroy an entire Course sync.
 
-实现完整：
+One failed embedding should not delete valid DocumentChunks.
+
+One failed Vision page should not invalidate unrelated pages.
+
+Preserve completed work whenever safe.
+
+---
+
+# 35. Logging
+
+Logs should help diagnose:
 
 Canvas
-
-→ Download
-
-→ Parse
-
-→ AI
-
-→ Database
-
-完整 workflow。
-
----
-
-Phase 7
-
-Frontend
-
-实现：
-
-Dashboard
-
-Course Page
-
-Week Page
-
-Resource Display
-
-Sync Canvas Button
-
-Sync Status
-
----
-
-Phase 8
-
-Testing & Polish
-
-运行：
-
-Backend Tests
-
-API Tests
-
-Frontend Tests
-
-Manual Workflow Test
-
-修复：
-
-Broken UI
-
-Broken API
-
-Error Handling
-
----
-
-Phase 9
-
+Document parsing
+Embeddings
+Retrieval
+AI generation
 RAG
+Sync
 
-只有前面全部运行正常后再开始。
+Never log:
 
----
-
-# 十八、你的工作方式
-
-非常重要：
-
-不要一次生成大量未经验证的代码。
-
-对于每一个 Phase：
-
-先检查当前项目状态。
-
-然后：
-
-Implement
-
-↓
-
-Run
-
-↓
-
-Test
-
-↓
-
-Fix
-
-↓
-
-确认当前阶段正常
-
-↓
-
-再进入下一阶段。
-
-如果出现错误：
-
-先自己分析错误日志并修复。
-
-不要简单把错误扔给我让我解决。
-
-如果你能够运行 Terminal：
-
-请真正运行命令验证。
-
-不要说：
-
-“This should work.”
-
-而应该实际确认：
-
-“This works.”
+API keys
+Authorization headers
+full sensitive documents unnecessarily
 
 ---
 
-# 十九、不要随意改变项目目标
+# 36. UI Philosophy
 
-如果发现某个技术选择有问题：
+StudyFlow is a learning product.
 
-先说明：
+The UI should be:
 
-Current approach
+Clean
+Minimal
+Academic
+Readable
 
-Problem
+Do not make it resemble an infrastructure/admin console.
 
-Recommended change
-
-Reason
-
-然后再修改。
-
-不要因为实现起来比较麻烦就擅自删除核心需求。
+Technical details should be progressively disclosed only when useful.
 
 ---
 
-# 二十、第一步
+# 37. Scope Control
 
-现在请先不要一次把整个项目代码全部生成出来。
+Do not spontaneously introduce:
 
-首先完成：
+- microservices
+- Kafka
+- Kubernetes
+- Redis
+- distributed queues
+- GraphQL
+- authentication systems
+- social features
 
-1. 分析整个需求
-2. 给出最终系统架构
-3. 给出完整目录结构
-4. 给出 Database Schema
-5. 给出 API 设计
-6. 给出 Canvas → AI → Database → Frontend 的数据流
-7. 给出 MVP Development Plan
-8. 指出可能存在的技术风险
+StudyFlow is currently a local single-user application.
 
-完成这些之后：
+Use the simplest architecture that reliably supports the feature.
 
-如果当前环境允许你直接操作项目文件，请立即开始 Phase 1，并建立实际项目。
+---
 
-如果你是 Coding Agent：
+# 38. V2 Stop Conditions
 
-从此之后请把自己当成该项目的 Lead Engineer，持续检查整个 Repository 的状态，不要孤立地修改单个文件。
+Do not implement all V2 features at once.
 
-最终目标不是“给我一些示例代码”。
+Each V2 phase must be completed, tested and reviewed before starting the
+next one.
 
-最终目标是：
+Current intended order:
 
-# 交付一个真正可以运行的 StudyFlow MVP。
+V2.1 Resource Classification
+V2.2 DocumentPage / Slide Visuals
+V2.3 Lecture / Tutorial Pipelines
+V2.4 Embedding / Retrieval
+V2.5 Course RAG
+V2.6 Multimodal RAG
+
+Do not automatically proceed to the next phase after completing one.
+
+---
+
+# 39. Definition of Done
+
+A task is complete only when:
+
+- implementation exists
+- relevant tests pass
+- existing behavior has no obvious regression
+- documentation is updated if necessary
+- data safety is preserved
+- private data is not exposed
+- the feature was actually verified
+
+---
+
+# 40. Communication
+
+After completing work, report briefly:
+
+1. What changed
+2. Which files changed
+3. Architecture impact
+4. Tests run
+5. Test results
+6. Real integration performed or not
+7. Remaining limitations
+8. Whether the requested phase is complete
+
+Do not claim something works if it was not actually verified.
+
+---
+
+# 41. Core Principle
+
+StudyFlow should grow incrementally from a stable V1.
+
+Never sacrifice:
+
+- source traceability
+- data safety
+- correctness
+- maintainability
+
+for faster feature expansion.
+
+The goal is not to add the largest number of AI features.
+
+The goal is to build a reliable learning system grounded in the user's
+actual university course materials.

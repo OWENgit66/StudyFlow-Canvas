@@ -1,6 +1,6 @@
 """Stable Canvas identities and minimal legacy Week adoption."""
 import re
-from sqlalchemy import select
+from sqlalchemy import select, update
 from app.models import Course, Semester, Week, Resource
 from app.services.canvas_mapping import canvas_course_to_course
 from app.services.semester_scope import active_semester
@@ -56,14 +56,20 @@ def upsert_week(db, course, module):
     return week
 
 
-def find_resource(db, file_id):
-    rows = db.scalars(select(Resource).where(Resource.canvas_file_id == file_id)).all()
+def find_resource(db, file_id, *, external_source_key=None):
+    identity = (Resource.external_source_key == external_source_key if external_source_key
+                else Resource.canvas_file_id == file_id)
+    if file_id is None and not external_source_key:
+        raise ValueError('A material identity is required.')
+    rows = db.scalars(select(Resource).where(identity)).all()
     if len(rows) > 1:
         raise ValueError('Ambiguous legacy Canvas file identity; resolve duplicate resources.')
     return rows[0] if rows else None
 
 
 def classify(resource, remote):
+    if hasattr(remote, 'source_key'):
+        return 'NEW' if resource is None else ('UNCHANGED' if resource.external_revision == remote.revision else 'UPDATED')
     if remote.updated_at is None or remote.updated_at.tzinfo is None:
         raise ValueError('Canvas file lacks a reliable update timestamp.')
     if resource is None:
@@ -71,3 +77,10 @@ def classify(resource, remote):
     if resource.canvas_updated_at is None or remote.updated_at > resource.canvas_updated_at:
         return 'UPDATED'
     return 'UNCHANGED'
+
+
+def update_resource_type(db, resource, resource_type):
+    """Role metadata must not touch file timestamps or invalidate current knowledge."""
+    if resource.resource_type != resource_type:
+        db.execute(update(Resource).where(Resource.id == resource.id).values(
+            resource_type=resource_type, updated_at=Resource.updated_at))

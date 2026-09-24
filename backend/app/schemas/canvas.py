@@ -42,6 +42,7 @@ class CanvasModuleItem(CanvasSchema):
     type: str  # Retain unknown/new item types without breaking discovery.
     position: NonNegativeInt | None = None
     content_id: PositiveInt | None = None
+    page_url: str | None = None
 
     @computed_field
     @property
@@ -58,6 +59,14 @@ class CanvasFile(CanvasSchema):
     created_at: datetime | None = None
     updated_at: datetime | None = None
     download_url: str | None = Field(default=None, validation_alias="url", repr=False)
+    locked_for_user: bool = False
+
+
+class CanvasPage(CanvasSchema):
+    page_id: PositiveInt
+    url: str
+    title: str
+    body: str | None = Field(default=None, repr=False)
     locked_for_user: bool = False
 
 
