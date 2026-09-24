@@ -39,6 +39,12 @@ class Timestamps(CreatedAt):
     )
 
 
+class ResourceType(StrEnum):
+    lecture = 'lecture'
+    tutorial = 'tutorial'
+    other = 'other'
+
+
 class ResourceStatus(StrEnum):
     pending = "pending"
     downloaded = "downloaded"

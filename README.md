@@ -2,12 +2,14 @@
 
 面向大学生的个人课程学习平台，目标是按 Semester → Course → Week 整理课程资料并生成有来源的结构化学习知识。
 
-**V1 MVP：Complete。V2：Not started。** 已完成 Canvas → 本地 PDF → 分页解析 → AI 结构化知识 → SQLite → 学习网页的完整流程，并通过真实单文件验收和自动化回归。发布状态见 [V1 验证记录](docs/v1-release.md)，后续计划见 [Roadmap](docs/roadmap.md)。
+**V1 MVP：Complete / Stable。V2.1：Resource Classification。** 已完成 Canvas → 本地 PDF → 分页解析 → AI 结构化知识 → SQLite → 学习网页的完整流程，并通过真实单文件验收和自动化回归。V2.1 增加 lecture / tutorial / other 资源类型及 Week 页面标签；V2.2 尚未开始。发布状态见 [V1 验证记录](docs/v1-release.md)，后续计划见 [Roadmap](docs/roadmap.md)。
 
 ## V1 功能
 
 - 单用户本地平台，按 Semester → Course → Week → Resource 组织资料。
 - Canvas REST API 只读集成，支持分页、受控下载和手动 Sync Canvas。
+- Module 中的 Page 可通过官方 API 读取 HTML，发现课件链接并复用现有 Resource 流程；Canvas 文件按 ID 去重，安全的外部直链 PDF 使用独立身份。详见 [Page-linked materials](docs/page-materials.md)。
+- 默认跳过明确标为 Reading / Reference 的资料，不下载、不解析、不调用 AI；Lecture / Tutorial 等核心教学资料正常处理，无法判断的资料保留原流程并报告 UNKNOWN。直接 File 与 Page 链接共用可配置分类规则。
 - 以数据库中的 active Semester 和 Canvas term ID 为唯一同步范围；历史课程保留，但不进入默认 Dashboard 或同步发现流程。
 - 同步以后台请求启动，通过轮询显示课程、Module、文件、阶段和真实计数；支持安全取消及中断状态恢复。
 - 基于 Canvas file ID 与更新时间增量同步；unchanged 文件跳过下载、解析与 AI，记录状态、计数和每文件失败。
@@ -46,7 +48,7 @@ FastAPI API → SyncService → CanvasService (GET only)
 
 ## 开发规则
 
-根目录 [AGENTS.md](AGENTS.md) 是项目的长期开发规则。每个阶段先检查仓库，再实现、运行、验证和修复。V1 已完成；V2 尚未开始，本次仅整理、验证和提交现有 MVP。
+根目录 [AGENTS.md](AGENTS.md) 是项目的长期开发规则。每个阶段先检查仓库，再实现、运行、验证和修复。V1 保持稳定；V2 按阶段扩展。资源类型、兼容迁移及分类边界见 [V2.1 Resource Classification](docs/resource-classification.md)。
 
 ## 技术栈与结构
 

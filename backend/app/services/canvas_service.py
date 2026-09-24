@@ -4,13 +4,13 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 import logging
-from urllib.parse import urljoin, urlsplit
+from urllib.parse import quote, urljoin, urlsplit
 
 import httpx2 as httpx
 from pydantic import ValidationError
 
 from app.core.config import Settings
-from app.schemas.canvas import CanvasCourse, CanvasFile, CanvasModule, CanvasModuleItem
+from app.schemas.canvas import CanvasCourse, CanvasFile, CanvasModule, CanvasModuleItem, CanvasPage
 from app.services.canvas_errors import (
     CanvasError, CanvasAuthenticationError, CanvasConfigurationError,
     CanvasConnectionError, CanvasDownloadError, CanvasNotFoundError,
@@ -172,6 +172,32 @@ class CanvasService:
 
     def get_files(self, course_id: int) -> list[CanvasFile]:
         return self._get_paginated(f"courses/{positive_id(course_id)}/files", CanvasFile)
+
+    def get_page(self, course_id: int, page_url_or_id: str | int) -> CanvasPage:
+        if isinstance(page_url_or_id, int):
+            locator = f'page_id:{positive_id(page_url_or_id)}'
+        elif (isinstance(page_url_or_id, str) and page_url_or_id.strip()
+              and len(page_url_or_id) <= 1000
+              and not any(c in page_url_or_id for c in '/\\?#%')
+              and page_url_or_id not in {'.', '..'}):
+            locator = page_url_or_id
+        else:
+            raise CanvasError('Invalid Canvas page identifier.')
+        payload, _ = self._json(self._base + f'courses/{positive_id(course_id)}/pages/' + quote(locator, safe=':'))
+        page = self._parse(CanvasPage, payload)
+        if page.locked_for_user:
+            raise CanvasPermissionError('Canvas page is locked for the current user.')
+        if page.body is None:
+            raise CanvasError('Canvas page has no accessible HTML body.')
+        return page
+
+    def get_external_file(self, url):
+        from app.services.external_pdf import ExternalPDFClient
+        return ExternalPDFClient(self._settings).metadata(url)
+
+    def download_external_file(self, metadata, *, context, existing_path=None):
+        from app.services.external_pdf import ExternalPDFClient
+        return ExternalPDFClient(self._settings).download(metadata, context, existing_path=existing_path)
 
     def get_file(self, file_id: int) -> CanvasFile:
         payload, _ = self._json(self._base + f"files/{positive_id(file_id)}")

@@ -1,0 +1,5 @@
+[
+  {"sample_id":"example-001","filename":"Week 4 Lecture Slides.pdf","module_name":"Week 4","page_title":"","link_title":"","nearby_text":"","expected_type":"lecture"},
+  {"sample_id":"example-002","filename":"Exercises.pdf","module_name":"Week 5","page_title":"Week 5 Tutorial","link_title":"","nearby_text":"","expected_type":"tutorial"},
+  {"sample_id":"example-003","filename":"Schedule.pdf","module_name":"Unit information","page_title":"","link_title":"","nearby_text":"","expected_type":"other"}
+]
