@@ -7,38 +7,61 @@ from app.models.common import ResourceType
 
 
 def resource_role_evidence(**context):
-    """Keep only role signals, not private text, while merging duplicate discoveries.
-
-    Filenames, link/item labels and Page titles are direct signals (in that
-    order). Module titles and nearby prose are weaker context. Explicit other
-    intent competes only with weak context, including after duplicate merging.
-    Conflicting signals at the strongest level mean 'other'.
-    """
-    priorities = {'filename': 4, 'display_name': 4, 'item_title': 3, 'link_text': 3,
-                  'page_title': 2, 'module_title': 1, 'nearby_text': 0}
+    """Bounded role evidence; repeated words/duplicate discoveries add no votes."""
+    priorities = {'filename': 12, 'display_name': 12, 'item_title': 10, 'link_text': 10,
+                  'page_title': 8, 'module_title': 4, 'nearby_text': 2}
     signals = []
     for source, value in context.items():
         if source not in priorities or not isinstance(value, str):
             continue
         text = normalize(value)
-        # Rank 1 blocks context-only inference, but never overrides direct
-        # Lecture/Tutorial titles. Accept Assignment1, not "reassignment".
-        if re.search(r'\b(?:assignments?|assessments?|homework|readings?)(?:\d+)?\b', text):
-            signals.append((1, ResourceType.other.value))
+        if re.search(r'\b(?:assignments?|assessments?|homework|readings?|syllabus|course outline|'
+                     r'projects?|exams?|rubrics?|announcements?|reference materials?)(?:\d+)?\b', text):
+            signals.append((max(5, priorities[source] - 1), ResourceType.other.value))
         for role, pattern in ((ResourceType.lecture, r'\b(?:lectures?|lec)\b'),
                               (ResourceType.tutorial, r'\b(?:tutorials?|tut)\b')):
             if re.search(pattern, text):
                 signals.append((priorities[source], role.value))
+        for role, pattern in (('lecture', r'\b(?:slides?|presentation|topic overview|concepts)\b'),
+                              ('tutorial', r'\b(?:exercises?|worksheets?|practice|solutions?|answers?|labs?|practicals?|workshops?)\b')):
+            if re.search(pattern, text):
+                signals.append((3 if priorities[source] >= 8 else 1, role))
     return sorted(set(signals))
 
 
 def classify_resource_type(evidence=(), **context):
-    signals = [*evidence, *resource_role_evidence(**context)]
-    if not signals:
-        return ResourceType.other
-    strongest = max(rank for rank, _ in signals)
-    roles = {role for rank, role in signals if rank == strongest}
-    return ResourceType(next(iter(roles))) if len(roles) == 1 else ResourceType.other
+    return score_resource_metadata(evidence, **context).resource_type
+
+
+@dataclass(frozen=True)
+class RoleDecision:
+    resource_type: ResourceType = ResourceType.other
+    confidence: float = 0.0
+    method: str = 'metadata'
+    reason: str = 'Insufficient role evidence.'
+
+
+def score_resource_metadata(evidence=(), **context):
+    signals = set(map(tuple, evidence)) | set(resource_role_evidence(**context))
+    scores = {}
+    for role in ResourceType:
+        weights = sorted({weight for weight, name in signals if name == role.value}, reverse=True)
+        # Strongest direct evidence dominates; corroboration contributes at most one point.
+        scores[role] = weights[0] + (1 if len(weights) > 1 else 0) if weights else 0
+    if any(weight >= 8 and role in {'lecture', 'tutorial'} for weight, role in signals):
+        # Preserve V2.2a direct-title precedence (e.g. Reading.pdf linked as Tutorial
+        # examples). Conflicting purpose still reduces the confidence/margin.
+        scores[ResourceType.other] = min(scores[ResourceType.other], 6)
+    ranking = sorted(scores, key=scores.get, reverse=True)
+    winner = ranking[0]
+    strength, margin = scores[winner], scores[winner] - scores[ranking[1]]
+    supported = strength >= 4 or (2, winner.value) in signals
+    if not supported or margin < 2:
+        return RoleDecision(confidence=0.2 if strength else 0.0,
+                            reason='Weak or conflicting role evidence.')
+    confidence = 0.9 if strength >= 7 and margin >= 3 else 0.65
+    return RoleDecision(winner, confidence, reason='Direct role evidence.' if confidence >= 0.8
+                        else 'Low-strength or competing role evidence; review or fallback needed.')
 
 
 class MaterialKind(StrEnum):

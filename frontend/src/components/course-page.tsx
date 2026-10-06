@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 import { useData } from "@/lib/use-data";
 import { Breadcrumbs, Empty, Loading, LoadError } from "./page-state";
 import { SyncButton, SyncFeedback, useSync } from "./sync";
+import { CourseQA } from "./course-qa";
 
 export function CoursePage({ id }: { id: number }) {
   const sync = useSync();
@@ -25,5 +26,6 @@ export function CoursePage({ id }: { id: number }) {
     <section className="course-section"><div className="section-heading"><h2>Course modules</h2><span className="small muted">Choose where to begin</span></div>
       {weeks.length ? <div className="module-list">{weeks.map((week, index) => <Link key={week.id} href={`/weeks/${week.id}`} className="module-row"><span className="module-number" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span><div><h3>{week.title}</h3><span className="small muted">Explore learning content & materials</span>{week.resource_count !== undefined && <span className="small muted"> · {week.resource_count} materials</span>}{!!week.resources_need_review && <p className="small muted">⚠ {week.resources_need_review} material{week.resources_need_review === 1 ? " needs" : "s need"} parsing review</p>}{!!week.parsing_reports_unavailable && <p className="small muted">{week.parsing_reports_unavailable} parsing reports unavailable</p>}</div><span className="arrow" aria-hidden="true">↗</span></Link>)}</div> : <Empty title="No modules yet">Sync this course to bring in its Canvas modules.</Empty>}
     </section>
+    <CourseQA key={id} courseId={id} />
   </>;
 }

@@ -1,4 +1,4 @@
-# V2.1 classification baseline（离线）
+# Resource classification evaluation（离线）
 
 这里只评测生产函数 `app.services.material_classification.classify_resource_type`，不复制规则，不启动应用或 SyncService，不读取配置/凭据、数据库或 PDF，不调用 Canvas/LLM。数据准备与评测执行分开；评测只读取指定 JSON。
 
@@ -7,7 +7,7 @@
 在 `backend` 目录：
 
 ```powershell
-.venv\Scripts\python.exe -m evals.resource_classification --dataset ../data/classification-baseline/resource_classification_gold.json --output ../data/classification-baseline/baseline-results.json
+.venv\Scripts\python.exe -m evals.resource_classification --split regression --dataset ../data/classification-baseline/resource_classification_gold.json --output ../data/classification-baseline/regression-results.json
 ```
 
 跨平台、已激活环境时可使用 `python -m evals.resource_classification ...`。
@@ -18,6 +18,26 @@
 .venv\Scripts\python.exe -m evals.resource_classification --dataset evals/resource_classification_example.json
 .venv\Scripts\python.exe -m pytest -q tests/test_classification_eval.py
 ```
+
+## Development / Regression 与 Holdout
+
+- V2.1 baseline：27/30（90%），历史结果保存在 `baseline-results.json`。
+- V2.2a regression：30/30（100%），使用同一份已参与规则调整的 development/regression 集。这不是 unseen accuracy。
+- V2.2a holdout：**pending**，目前没有人工标注样本，不能据此报告准确率。
+
+独立私有数据集为 `data/classification-holdout/resource_classification_holdout.json`，当前内容为 `[]`。此目录同样被 Git 忽略；新 checkout 可在该路径手工创建一个内容为 `[]` 的 JSON 文件。不要覆盖原 30 条 regression 标签，也不要覆盖历史 baseline 报告。
+
+在 `backend` 目录运行 holdout：
+
+```powershell
+.venv\Scripts\python.exe -m evals.resource_classification --split holdout --dataset ../data/classification-holdout/resource_classification_holdout.json --output ../data/classification-holdout/holdout-results.json
+```
+
+空数组正常返回 0，并提示 `No holdout samples available.`，总数为 0、准确率为 N/A。非空文件仍使用相同的严格标签/metadata 校验；格式错误不会被当成空数据集。默认 `--split regression` 继续要求非空数据。
+
+每次只评测 `--dataset` 指定的一组数据，不合并其他样本。终端和 JSON 的 `split` 字段区分 regression 与 holdout；holdout 预测字段为 `predicted_type`。Regression 为兼容既有报告保留 `v2_1_prediction` 字段名，但两种模式都调用**当前生产 classifier**，不会加载旧版本规则。
+
+添加 holdout 样本时，按下方相同格式追加对象，建议 ID 使用 `holdout-001` 等。只使用未参与 V2.2a 调整、且未出现在 regression 集中的真实文件；检查文件身份/来源，不能仅换一个 sample_id 重复已有资源。根据教育用途人工标注后再查看预测，保留可选 `source`/`annotation_note` 便于复核。不要依据 holdout 错误调整本次分类规则，也不要将合成测试用例加入真实 holdout。
 
 ## 添加人工标注样本
 

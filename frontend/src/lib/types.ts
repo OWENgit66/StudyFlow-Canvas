@@ -10,7 +10,14 @@ export interface ParsingHealth {
   pages_with_encoding_warnings: number; possible_scanned_pdf: boolean | null;
   issues: { page_number: number; category: string; label: string; explanation: string; severity: "info" | "warning" | "critical"; occurrences: number }[];
 }
+export interface CourseIndexStatus {
+  state: "ready" | "indexing" | "stale" | "unavailable" | "error";
+  message: string; total_chunks: number; indexed_chunks: number; missing_chunks: number;
+}
 export interface Resource {
+  classification_source?: "automatic" | "manual";
+  classification_confidence?: number | null;
+  classification_method?: "metadata" | "document_content" | "llm" | "manual" | null;
   resource_type: "lecture" | "tutorial" | "other";
   id: number; week_id: number; canvas_file_id: number | null; filename: string; file_type: string;
   sync_status: "pending" | "downloaded" | "parsed" | "processing" | "completed" | "failed";
@@ -44,3 +51,11 @@ export interface SyncResult {
   };
 }
 export interface DashboardData { semesters: Semester[]; active_semester: Semester | null; courses: CourseCardData[]; latest_sync: SyncResult | null }
+export interface CourseAnswer {
+  answerable: boolean;
+  answer: string;
+  sources: {
+    citation_id: number; resource_id: number; title: string; page: number | null;
+    week: string; resource_type: string; source_url: string | null;
+  }[];
+}

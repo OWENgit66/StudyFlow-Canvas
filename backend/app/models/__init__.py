@@ -10,5 +10,6 @@ from app.models.concept import Concept
 from app.models.question import Question
 from app.models.sync_record import SyncRecord
 from app.models.resource_knowledge import ResourceKnowledge
+from app.models.chunk_embedding import ChunkEmbedding
 
-__all__ = ["Semester", "Course", "Week", "Resource", "DocumentChunk", "Summary", "Concept", "Question", "SyncRecord", "ResourceKnowledge"]
+__all__ = ["Semester", "Course", "Week", "Resource", "DocumentChunk", "Summary", "Concept", "Question", "SyncRecord", "ResourceKnowledge", "ChunkEmbedding"]

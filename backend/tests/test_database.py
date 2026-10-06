@@ -15,7 +15,7 @@ def test_connection_tables_and_foreign_keys(engine, db):
     assert db.scalar(text("PRAGMA foreign_keys")) == 1
     assert set(inspect(engine).get_table_names()) == {
         "semesters", "courses", "weeks", "resources", "document_chunks",
-        "summaries", "concepts", "questions", "sync_records", "resource_knowledge",
+        "summaries", "concepts", "questions", "sync_records", "resource_knowledge", "chunk_embeddings",
     }
 
 

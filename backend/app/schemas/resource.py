@@ -1,4 +1,5 @@
 from pydantic import AwareDatetime, Field, PositiveInt
+from typing import Literal
 
 from app.models.common import ResourceStatus, ResourceType
 from app.schemas.common import Schema, TimestampRead
@@ -16,4 +17,17 @@ class ResourceCreate(Schema):
 
 
 class ResourceRead(ResourceCreate, TimestampRead):
-    pass
+    classification_source: Literal['automatic', 'manual'] = 'automatic'
+    classification_confidence: float | None = Field(default=None, ge=0, le=1)
+    classification_method: Literal['metadata', 'document_content', 'llm', 'manual'] | None = None
+
+
+class ResourceClassificationUpdate(Schema):
+    resource_type: ResourceType
+
+
+class ResourceClassificationRead(ResourceClassificationUpdate):
+    id: int
+    classification_source: Literal['automatic', 'manual']
+    classification_confidence: float | None = Field(default=None, ge=0, le=1)
+    classification_method: Literal['metadata', 'document_content', 'llm', 'manual'] | None = None

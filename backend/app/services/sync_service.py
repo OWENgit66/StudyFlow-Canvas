@@ -19,6 +19,7 @@ from app.services.page_materials import MaterialLink, extract_material_links
 from app.services.external_pdf import ExternalPDFError
 from app.services.material_classification import Classification, MaterialClassifier, MaterialKind, combine
 from app.services.material_classification import resource_role_evidence, classify_resource_type
+from app.services.resource_classification import ResourceClassificationService, bounded_metadata
 
 logger = logging.getLogger(__name__)
 _sync_lock = Lock()  # MVP requires one backend worker; background work stays in-process.
@@ -57,10 +58,12 @@ class SyncBusyError(Exception):
 
 
 class SyncService:
-    def __init__(self, settings, canvas_factory, documents, knowledge, ai_factory):
+    def __init__(self, settings, canvas_factory, documents, knowledge, ai_factory, *, indexer=None):
         self.settings, self.canvas_factory = settings, canvas_factory
         self.documents, self.knowledge, self.ai_factory = documents, knowledge, ai_factory
         self.material_classifier = MaterialClassifier(settings)
+        self.role_classifier = ResourceClassificationService()  # Offline by default; no paid classification in sync.
+        self.indexer = indexer
 
     def reserve(self, db, request, *, dry_run=False):
         global _active_sync_id
@@ -95,6 +98,7 @@ class SyncService:
             logger.info('Starting Canvas sync %d', record_id)
             seen = {}  # Identity -> first discovery context, shared with pending entries.
             pending = []  # Discover the selected scope before processing; no external queue.
+            index_courses = set()
             try:
                 self._checkpoint()
                 with self.canvas_factory() as canvas:
@@ -134,6 +138,7 @@ class SyncService:
                                 continue
                             if not dry_run:
                                 db.commit()
+                                index_courses.add(course.id)
                             record.courses_processed += 1
                             self._save(db, record)
                             self._course(db, record, canvas, course, remote, request, seen, dry_run, pending)
@@ -166,6 +171,28 @@ class SyncService:
                 record = db.get(SyncRecord, record_id)
                 self._error(db, record, 'discovery')
                 record.status = SyncStatus.failed
+            if self.indexer and not dry_run and record.status in {SyncStatus.completed, SyncStatus.completed_with_errors}:
+                indexing = {}
+                material_status = record.status
+                record.status = SyncStatus.running
+                for course_id in sorted(index_courses):
+                    if _cancel_event.is_set():
+                        break
+                    indexed_course = db.get(Course, course_id)
+                    record.details = {**record.details, 'progress': {**record.details.get('progress', {}),
+                        'stage': 'indexing', 'processing': True,
+                        'course_code': indexed_course.code, 'course_name': indexed_course.name,
+                        'course_id': indexed_course.canvas_course_id, 'module': None, 'module_id': None,
+                        'filename': None, 'resource_id': None}}
+                    self._save(db, record)
+                    try:
+                        indexing[str(course_id)] = {'state': 'completed', 'stats': self.indexer(db, course_id)}
+                    except Exception:
+                        db.rollback()
+                        indexing[str(course_id)] = {'state': 'error', 'message': 'Local indexing failed; synced materials are preserved.'}
+                    record.details = {**record.details, 'indexing': indexing}
+                    self._save(db, record)
+                record.status = SyncStatus.cancelled if _cancel_event.is_set() else material_status
             record.completed_at = utc_now()
             record.details = {**record.details, 'progress': {**record.details.get('progress', {}),
                               'stage': record.status.value, 'processing': False}}
@@ -262,6 +289,7 @@ class SyncService:
                         source_page_title=(link.page_title or item.title) if via_page else None,
                         material_classification=decision.kind.value, classification_reasons=list(decision.reasons),
                         role_evidence=role_evidence,
+                        role_metadata=bounded_metadata(material_context),
                         resource_type=classify_resource_type(role_evidence).value,
                         external_source_key=link.key[1] if link.external_url else None)
                     seen[link.key] = context
@@ -330,6 +358,9 @@ class SyncService:
             classification = repository.classify(resource, metadata)
             resource_type = classify_resource_type(record.details['progress'].get('role_evidence', ()),
                 filename=metadata.filename, display_name=getattr(metadata, 'display_name', None))
+            role_metadata = {**record.details['progress'].get('role_metadata', {}),
+                'filename': metadata.filename, 'display_name': getattr(metadata, 'display_name', None)}
+            role_evidence = record.details['progress'].get('role_evidence', ())
             self._progress(db, record, 'checking', filename=metadata.filename, resource_id=resource_id,
                            resource_type=resource_type.value)
             self._event(db, record, file_id, resource_id, 'discovery', classification)
@@ -341,7 +372,8 @@ class SyncService:
                 self._save(db, record)
                 return
             if resource is not None:
-                repository.update_resource_type(db, resource, resource_type)
+                self.role_classifier.apply(db, resource, metadata=role_metadata, evidence=role_evidence,
+                                           use_content=classification == 'UNCHANGED')
                 db.commit()
             if classification == 'UNCHANGED' and resource.sync_status == ResourceStatus.completed:
                 record.files_skipped += 1
@@ -360,6 +392,9 @@ class SyncService:
                 db.add(resource)
                 db.commit()
                 resource_id = resource.id
+                self.role_classifier.apply(db, resource, metadata=role_metadata, evidence=role_evidence,
+                                           use_content=False)
+                db.commit()
             self._progress(db, record, 'checking', resource_id=resource_id)
             if classification == 'UPDATED':
                 resource.sync_stage, resource.sync_status = 'download', ResourceStatus.pending
@@ -421,6 +456,8 @@ class SyncService:
                 stage = 'knowledge'
             if stage != 'knowledge':
                 raise ValueError('Unknown resource resume stage.')
+            self.role_classifier.apply(db, resource, metadata=role_metadata, evidence=role_evidence)
+            db.commit()
             # Existing KnowledgeService verifies fresh PDF warnings/chunks internally;
             # resume does not repeat process_resource or replace valid stored chunks.
             resource.sync_stage, resource.sync_status = 'knowledge', ResourceStatus.parsed

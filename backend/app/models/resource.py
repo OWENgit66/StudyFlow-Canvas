@@ -13,6 +13,7 @@ class Resource(Timestamps, Base):
         UniqueConstraint("week_id", "canvas_file_id"),
         UniqueConstraint("id", "week_id"),  # composite knowledge source FK
         CheckConstraint("canvas_file_id > 0"),
+        CheckConstraint("classification_source IN ('automatic', 'manual')"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -25,6 +26,20 @@ class Resource(Timestamps, Base):
     resource_type: Mapped[ResourceType] = mapped_column(
         enum_column(ResourceType), default=ResourceType.other, server_default='other'
     )
+    # Deferred so existing read-only retrieval snapshots remain readable without migration.
+    classification_source: Mapped[str] = mapped_column(
+        String(10), default='automatic', server_default='automatic', deferred=True
+    )
+    classification_details: Mapped[dict | None] = mapped_column(JSON, deferred=True)
+
+    @property
+    def classification_confidence(self):
+        return 1.0 if self.classification_source == 'manual' else (self.classification_details or {}).get('confidence')
+
+    @property
+    def classification_method(self):
+        return 'manual' if self.classification_source == 'manual' else (self.classification_details or {}).get('method')
+
     local_path: Mapped[str | None] = mapped_column(String(1000))
     canvas_updated_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     sync_stage: Mapped[str | None] = mapped_column(String(20))

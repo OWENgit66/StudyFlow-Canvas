@@ -15,6 +15,7 @@ from app.api.knowledge import router as knowledge_router, ai_error_handler
 from app.services.ai_errors import AIError
 from app.api.sync import router as sync_router
 from app.api.study import router as study_router
+from app.api.ask import router as ask_router
 from app.core.config import Settings
 from app.core.database import build_engine, create_session_factory, init_db
 
@@ -27,8 +28,10 @@ def create_app(database_engine: Engine | None = None) -> FastAPI:
             init_db(engine)
             application.state.session_factory = create_session_factory(engine)
             from app.services.sync_service import recover_interrupted
+            from app.services.course_index import recover_interrupted_indexes
             with application.state.session_factory() as session:
                 recover_interrupted(session)
+                recover_interrupted_indexes(session)
             yield
         finally:
             if database_engine is None:
@@ -44,6 +47,7 @@ def create_app(database_engine: Engine | None = None) -> FastAPI:
     application.include_router(knowledge_router)
     application.include_router(sync_router)
     application.include_router(study_router)
+    application.include_router(ask_router)
     application.add_exception_handler(AIError, ai_error_handler)
     return application
 

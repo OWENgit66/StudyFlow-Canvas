@@ -54,10 +54,17 @@ def test_additive_migration_preserves_legacy_rows_and_is_repeatable():
     with engine.begin() as conn:
         assert conn.execute(text('SELECT id,canvas_file_id,local_path,resource_type FROM resources')).one() == (1,123,'materials/example.pdf','other')
         assert conn.execute(text('SELECT content FROM document_chunks')).scalar_one() == 'Synthetic source'
+        assert conn.execute(text('SELECT classification_source FROM resources')).scalar_one() == 'automatic'
+        assert conn.execute(text('SELECT classification_details FROM resources')).scalar_one() is None
+        conn.execute(text('UPDATE resources SET classification_details = :details'),
+                     {'details': '{"method":"metadata","confidence":0.9}'})
         conn.execute(text("UPDATE resources SET resource_type='tutorial' WHERE id=1"))
+        conn.execute(text("UPDATE resources SET classification_source='manual' WHERE id=1"))
     upgrade_sync_columns(engine)
     with engine.begin() as conn:
         assert conn.execute(text('SELECT resource_type FROM resources')).scalar_one() == 'tutorial'
+        assert conn.execute(text('SELECT classification_source FROM resources')).scalar_one() == 'manual'
+        assert conn.execute(text('SELECT classification_details FROM resources')).scalar_one() == '{"method":"metadata","confidence":0.9}'
         assert conn.execute(text('PRAGMA foreign_key_check')).all() == []
         with pytest.raises(IntegrityError):conn.execute(text("UPDATE resources SET resource_type='lab'"))
     engine.dispose()
@@ -110,3 +117,48 @@ def test_unchanged_file_can_gain_role_without_reprocessing_or_invalidating_knowl
     assert before==(resource.id,resource.canvas_updated_at,resource.updated_at,resource.local_path,chunk.id,chunk.content)
     assert calls==(len(canvas.downloads),sync_setup[2].parse.call_count,sync_setup[5].call_count)
     assert not sync_setup[3].read(db,resource.id).stale
+
+
+def test_manual_update_persists_without_touching_material_metadata(client, db, graph):
+    resource = graph[-1]
+    before = (resource.updated_at, resource.local_path, resource.canvas_updated_at, resource.sync_status)
+    response = client.patch(f'/api/resources/{resource.id}/classification', json={'resource_type': 'lecture'})
+    assert response.status_code == 200
+    assert response.json() == {'id': resource.id, 'resource_type': 'lecture', 'classification_source': 'manual',
+                               'classification_confidence': 1.0, 'classification_method': 'manual'}
+    db.refresh(resource)
+    assert before == (resource.updated_at, resource.local_path, resource.canvas_updated_at, resource.sync_status)
+    row = client.get(f'/api/weeks/{resource.week_id}/resources').json()[0]
+    assert row['resource_type'] == 'lecture' and row['classification_source'] == 'manual'
+    assert client.patch(f'/api/resources/{resource.id}/classification', json={'resource_type': 'lab'}).status_code == 422
+    assert client.patch('/api/resources/999/classification', json={'resource_type': 'lecture'}).status_code == 404
+
+
+@pytest.mark.parametrize('manual_type', ['lecture', 'tutorial', 'other'])
+def test_sync_cannot_overwrite_manual_even_after_automatic_context_changes(db, client, sync_setup, manual_type):
+    canvas = sync_setup[1]
+    run(db, sync_setup)
+    resource = db.scalar(select(Resource))
+    before = (resource.updated_at, resource.canvas_updated_at, resource.local_path)
+    calls = (len(canvas.downloads), sync_setup[2].parse.call_count, sync_setup[5].call_count)
+    assert client.patch(f'/api/resources/{resource.id}/classification', json={'resource_type': manual_type}).status_code == 200
+    canvas.get_module_items = Mock(return_value=[CanvasModuleItem(id=1,module_id=51,title='Tutorial',type='File',content_id=201)])
+    result = run(db, sync_setup)
+    db.refresh(resource)
+    assert resource.resource_type == manual_type and resource.classification_source == 'manual'
+    assert before == (resource.updated_at, resource.canvas_updated_at, resource.local_path)
+    assert calls == (len(canvas.downloads), sync_setup[2].parse.call_count, sync_setup[5].call_count)
+    assert result.files_skipped == 1
+    assert not sync_setup[3].read(db, resource.id).stale
+
+
+def test_automatic_write_has_database_guard_against_stale_session(db, graph):
+    from sqlalchemy import update
+    from app.repositories.sync import update_resource_type
+    resource = graph[-1]
+    # Simulate manual override after sync has already loaded the Resource.
+    db.execute(update(Resource).where(Resource.id == resource.id).values(
+        classification_source='manual', resource_type='tutorial').execution_options(synchronize_session=False))
+    update_resource_type(db, resource, ResourceType.lecture)
+    db.commit(); db.refresh(resource)
+    assert resource.resource_type == 'tutorial' and resource.classification_source == 'manual'
