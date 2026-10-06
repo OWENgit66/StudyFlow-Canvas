@@ -1,5 +1,7 @@
 # RAG V0.4 — Local reranker experiment
 
+> Historical V0.4 controlled experiment. See [Evaluation](evaluation.md) for the result sequence and [RAG pipeline](rag-pipeline.md) for current integration. Experimental scope statements below are historical.
+
 Keep the V0.3 multilingual MiniLM retriever, its SQLite index, V0.2 hygiene,
 original chunks, questions and reviewed pages unchanged. Use five candidates
 per query: this isolates ordering, preserves the candidate set and bounds work

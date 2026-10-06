@@ -1,5 +1,7 @@
 # RAG V0.3 — Multilingual Embedding A/B
 
+> Historical V0.3 controlled experiment. Its aggregate comparison is consolidated in [Evaluation](evaluation.md); the live system now uses the multilingual model as described in [RAG pipeline](rag-pipeline.md).
+
 This experiment changes the embedding model while reusing the production provider,
 RetrievalService, V0.2 hygiene, cosine/Top-K logic and V0.1 Eval unchanged. It does
 not generate answers or change the default production model.

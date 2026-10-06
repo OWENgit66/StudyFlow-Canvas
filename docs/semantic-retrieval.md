@@ -1,5 +1,7 @@
 # RAG V0 — Local Semantic Retrieval Prototype
 
+> Historical V0–V0.2 implementation/experiment reference. See [Evaluation](evaluation.md) for the consolidated results and [RAG pipeline](rag-pipeline.md) for current live behavior. Scope exclusions below belong to those experiments.
+
 本阶段只返回 Top-K 原文 chunks，不生成答案，不添加 API 或 UI。复用已有 DocumentChunk，严格先按 Course 筛选，默认包含 lecture/tutorial/other。
 
 ## 安装与准备

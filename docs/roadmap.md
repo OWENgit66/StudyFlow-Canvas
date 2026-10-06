@@ -1,23 +1,19 @@
-# StudyFlow roadmap
+# StudyFlow scope and roadmap
 
-| Version | Status | Scope |
-| --- | --- | --- |
-| V1 MVP | **Complete** | Local single-user Canvas → PDF → structured AI knowledge → SQLite → learning UI |
-| V2.1 | **Complete** | Resource roles: lecture / tutorial / other; additive migration, API metadata and Week-page labels |
-| V2.2–V2.6 | **Not started** | Visual pages; separate knowledge pipelines; embeddings; course RAG; multimodal RAG, in that order |
+This is the current capability map. Phase numbering in AGENTS.md and historical records describes the intended sequence; later explicitly scoped tasks delivered text RAG before visual/multimodal features.
 
-## V1 delivered
+| Capability | Status |
+|---|---|
+| V1 Canvas → PDF → structured knowledge → learning UI | Complete / stable foundation |
+| Resource roles and metadata conflict handling | Implemented; small regression set documented |
+| Existing-content / optional LLM classification fallback | Implemented with bounded maintenance calls |
+| Manual classification override | Implemented; sync must not overwrite it |
+| Multilingual embedding + local reranker | Implemented; frozen V0–V0.4 experiments preserved |
+| Course Q&A API and single-answer UI | Implemented with validated source metadata |
+| Multi-course shared index / existing-course backfill | Implemented and locally verified |
+| Adjacent continuity / plain-text answer prompt | Implemented; tests/local preview passed; subsequent real browser IDEA9106 Q&A smoke validated by the user |
+| Independent classification holdout | Infrastructure available; labeling/evaluation pending |
+| DocumentPage screenshots / multimodal RAG | Deferred; not implemented |
+| Separate Lecture/Tutorial knowledge-generation pipelines | Deferred; not implemented |
 
-- Next.js / TypeScript / Tailwind frontend and FastAPI / SQLAlchemy / SQLite backend.
-- Semester, Course, Week, Resource, DocumentChunk, ResourceKnowledge, Summary, Concept, Question and SyncRecord models.
-- Read-only Canvas integration, pagination, safe storage and incremental manual sync with unchanged-file skipping and per-file errors.
-- PDF parsing and page-bound chunks, extraction metadata, conservative cleaning and quality warnings.
-- OpenAI/DeepSeek provider abstraction, bounded retries, schema/source validation, formula/symbolic safeguards, semantic review and transactional persistence.
-- Dashboard, Course and Week pages; persisted answer toggles, source-page links, original files, scoped sync and sync summaries.
-- Backend/API and frontend regression suites, production build and completed real-data acceptance. See [V1 release verification](v1-release.md).
-
-## V2 next steps — not started
-
-V2.1 is limited to resource classification. V2.2 DocumentPage and visual preservation require a separate task. Knowledge prompts, embeddings and RAG remain unchanged and unimplemented for V2. See AGENTS.md for the ordered plan.
-
-No V2 code, dependencies, infrastructure or new feature work is part of the V1 completion commit.
+No feature is scheduled by this documentation update. New work requires a separate scoped request. Incomplete acceptance and operational boundaries are in [limitations](limitations.md); measured results are in [evaluation](evaluation.md).

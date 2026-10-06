@@ -1,5 +1,7 @@
 # RAG V1 — Grounded Answer Generation Prototype
 
+> Historical answer-prototype reference with subsequent acceptance notes. Current architecture is described in [RAG pipeline](rag-pipeline.md); remaining caveats are in [Limitations](limitations.md).
+
 The CLI and historical results below describe the frozen experiment. The current Course Q&A HTTP/UI uses the shared live index described in [multi-course-indexing.md](multi-course-indexing.md); the answer/context/prompt logic remains shared.
 
 Status: the minimal Course Q&A API and frontend are now implemented and smoke-tested (2026-10-06). The earlier CLI/context experiment and its known grounding limitations remain documented below; those limitations were not changed in the API/UI task.
@@ -191,4 +193,4 @@ Only gaps of one or two pages are inspected. At most two pages are added, one ch
 
 The answer prompt now requests plain text and simple numbered lists without Markdown bold/headings/fences. Grounding, abstention and citation validation are unchanged. This is a formatting instruction, not a new renderer or post-processing guarantee.
 
-Verification on 2026-10-07: backend **884 passed, 1 skipped**; frontend **58 passed**; lint, TypeScript and production build passed. Real local preview confirmed the missing intermediate page was included. The single real Q&A attempt was blocked before execution by automatic approval review pending explicit permission to send the private evidence to DeepSeek; no new generated answer is claimed. Private details: `data/retrieval-eval/adjacent-continuity-report.md`.
+Verification on 2026-10-07: backend **884 passed, 1 skipped**; frontend **58 passed**; lint, TypeScript and production build passed. Real local preview confirmed the missing intermediate page was included. The earlier agent-run provider attempt was blocked before execution; the user subsequently completed a real browser IDEA9106 Course Q&A smoke test and confirmed a normal answer including the missing Step 2, Sources from the corresponding course material, and no observed cross-course sources. Adjacent evidence continuity is therefore smoke-validated; strict sentence-level grounding and formula-heavy parsing/generation risks remain. No additional metrics or token usage are claimed. The earlier local-preview record remains in `data/retrieval-eval/adjacent-continuity-report.md`.

@@ -1,5 +1,7 @@
 # StudyFlow RAG Readiness Audit
 
+> Historical pre-RAG readiness audit. For the implemented system, see [Architecture](architecture.md), [RAG pipeline](rag-pipeline.md) and [current scope](roadmap.md). Statements about missing features below describe the audit date.
+
 审计日期：2026-09-25。范围：现有代码、数据库结构和只读汇总检查；只做分析与规划。本文件中的新增表、服务、API 和开发步骤均为建议，尚未实现。
 
 **结论：已有可复用的原文 chunks、课程归属、页码、解析警告和 LLM provider 边界。最小接入点是 `DocumentChunk`，无需重建 Canvas → PDF → Knowledge 管线。先确认可索引数据的新鲜度，再做单课程检索；SQLite 可以继续作为第一版存储。**
