@@ -79,8 +79,10 @@ def classify(resource, remote):
     return 'UNCHANGED'
 
 
-def update_resource_type(db, resource, resource_type):
+def update_resource_type(db, resource, resource_type, *, details=None):
     """Role metadata must not touch file timestamps or invalidate current knowledge."""
-    if resource.resource_type != resource_type:
-        db.execute(update(Resource).where(Resource.id == resource.id).values(
-            resource_type=resource_type, updated_at=Resource.updated_at))
+    if resource.resource_type != resource_type or details is not None:
+        return db.execute(update(Resource).where(Resource.id == resource.id,
+            Resource.classification_source != 'manual').values(
+            resource_type=resource_type, updated_at=Resource.updated_at,
+            **({'classification_details': details} if details is not None else {}))).rowcount

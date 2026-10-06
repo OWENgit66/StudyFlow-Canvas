@@ -1,5 +1,6 @@
 """Small student-facing read models; never include local storage paths."""
 from datetime import datetime
+from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.common import ResourceStatus, ResourceType, SyncStatus
@@ -79,6 +80,9 @@ class StudyResource(BaseModel):
     filename: str
     file_type: str
     resource_type: ResourceType = ResourceType.other
+    classification_source: Literal['automatic', 'manual'] = 'automatic'
+    classification_confidence: float | None = Field(default=None, ge=0, le=1)
+    classification_method: Literal['metadata', 'document_content', 'llm', 'manual'] | None = None
     sync_status: ResourceStatus
     file_available: bool
     size_bytes: int | None

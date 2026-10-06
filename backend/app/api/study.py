@@ -1,10 +1,10 @@
-"""Read-only presentation endpoints; generation stays in existing services."""
+"""Presentation and manual resource labels; generation stays in existing services."""
 from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Path as PathParam, Query
 from fastapi.responses import FileResponse
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.config import Settings
@@ -13,6 +13,7 @@ from app.models import Course, Resource, Semester, SyncRecord, Week
 from app.models.common import ResourceStatus
 from app.schemas.course import CourseRead
 from app.schemas.study import CourseCard, DashboardRead, StudyResource, SyncSummary
+from app.schemas.resource import ResourceClassificationRead, ResourceClassificationUpdate
 from app.services.material_paths import material_root, resolve_database_path, sanitize_component
 from app.services.semester_scope import active_semester
 from app.services.knowledge_service import KnowledgeService
@@ -75,10 +76,25 @@ def resources(week_id: ID, db: DB, root: Annotated[Path, Depends(get_material_ro
             path, size = None, None
         result.append(StudyResource(id=resource.id, week_id=resource.week_id,
             canvas_file_id=resource.canvas_file_id, filename=resource.filename, file_type=resource.file_type,
-            resource_type=resource.resource_type,
+            resource_type=resource.resource_type, classification_source=resource.classification_source,
+            classification_confidence=resource.classification_confidence,
+            classification_method=resource.classification_method,
             sync_status=resource.sync_status, file_available=path is not None, size_bytes=size,
             parsing_health=read_health(resource, root)))
     return result
+
+
+@router.patch('/resources/{resource_id}/classification', response_model=ResourceClassificationRead)
+def classify_resource(resource_id: ID, body: ResourceClassificationUpdate, db: DB):
+    resource = db.get(Resource, resource_id)
+    if resource is None:
+        raise HTTPException(404, 'Resource not found')
+    # Metadata only: preserve updated_at so knowledge freshness and sync stay unchanged.
+    db.execute(update(Resource).where(Resource.id == resource_id).values(
+        resource_type=body.resource_type, classification_source='manual', updated_at=Resource.updated_at))
+    db.commit()
+    db.refresh(resource)
+    return resource
 
 
 @router.get("/resources/{resource_id}/file")

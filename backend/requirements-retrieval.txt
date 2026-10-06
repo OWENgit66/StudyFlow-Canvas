@@ -1,0 +1,2 @@
+# Optional local CPU retrieval prototype; existing backend dependencies unchanged.
+fastembed==0.8.1

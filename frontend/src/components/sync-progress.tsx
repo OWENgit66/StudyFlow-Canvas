@@ -8,7 +8,7 @@ const steps = [
 ] as const;
 export function stageLabel(stage: string): string {
   return ({ discovery: "Discovering courses", checking: "Checking course materials", download: "Downloading material",
-    parse: "Reading document", generation: "Generating learning notes", knowledge: "Knowledge processing",
+    parse: "Reading document", generation: "Generating learning notes", knowledge: "Knowledge processing", indexing: "Indexing course materials",
     review: "Checking generated knowledge", persistence: "Saving learning material", completed: "Complete" } as Record<string, string>)[stage] ?? "Preparing materials";
 }
 export function duration(seconds: number): string {

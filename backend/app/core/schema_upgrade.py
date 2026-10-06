@@ -9,6 +9,9 @@ def upgrade_sync_columns(engine):
     with engine.begin() as connection:
         connection.exec_driver_sql('BEGIN IMMEDIATE')
         inspector = inspect(connection)
+        if 'courses' in inspector.get_table_names() and 'indexing_report' not in {
+                c['name'] for c in inspector.get_columns('courses')}:
+            connection.exec_driver_sql('ALTER TABLE courses ADD COLUMN indexing_report JSON')
         for table, (column, declaration) in additions.items():
             if table in inspector.get_table_names() and column not in {
                     c['name'] for c in inspector.get_columns(table)}:
@@ -21,6 +24,12 @@ def upgrade_sync_columns(engine):
             connection.exec_driver_sql('ALTER TABLE resources ADD COLUMN parsing_report JSON')
         if 'resources' in inspector.get_table_names():
             columns = {c['name'] for c in inspector.get_columns('resources')}
+            if 'classification_details' not in columns:
+                connection.exec_driver_sql('ALTER TABLE resources ADD COLUMN classification_details JSON')
+            if 'classification_source' not in columns:
+                connection.exec_driver_sql("ALTER TABLE resources ADD COLUMN classification_source VARCHAR(10) "
+                                           "NOT NULL DEFAULT 'automatic' "
+                                           "CHECK (classification_source IN ('automatic', 'manual'))")
             if 'resource_type' not in columns:
                 connection.exec_driver_sql("ALTER TABLE resources ADD COLUMN resource_type VARCHAR(8) "
                                            "NOT NULL DEFAULT 'other' "

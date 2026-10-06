@@ -1,4 +1,4 @@
-import type { Course, DashboardData, KnowledgeResponse, Resource, SyncResult, SyncScope, Week } from "./types";
+import type { Course, CourseAnswer, CourseIndexStatus, DashboardData, KnowledgeResponse, Resource, SyncResult, SyncScope, Week } from "./types";
 
 // Blank uses Next's same-origin proxy. No backend credential belongs here.
 const base = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "").replace(/\/$/, "");
@@ -15,6 +15,15 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   catch { throw new APIError(502); }
 }
 export const api = {
+  indexStatus: (id: number) => request<CourseIndexStatus>(`/courses/${id}/index-status`, { signal: AbortSignal.timeout(15000) }),
+  classifyResource: (id: number, resource_type: Resource["resource_type"]) => request<{
+    id: number; resource_type: Resource["resource_type"]; classification_source: "manual";
+  }>(`/resources/${id}/classification`, {
+    method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ resource_type }),
+  }),
+  ask: (id: number, question: string) => request<CourseAnswer>(`/courses/${id}/ask`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question }),
+  }),
   dashboard: () => request<DashboardData>("/study/dashboard"),
   course: (id: number) => request<Course>(`/courses/${id}`),
   weeks: (id: number) => request<Week[]>(`/courses/${id}/weeks`),

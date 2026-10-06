@@ -1,4 +1,4 @@
-from sqlalchemy import CheckConstraint, ForeignKey, String
+from sqlalchemy import CheckConstraint, ForeignKey, String, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -14,5 +14,6 @@ class Course(Timestamps, Base):
     canvas_course_id: Mapped[int | None] = mapped_column(unique=True)
     code: Mapped[str] = mapped_column(String(80))
     name: Mapped[str] = mapped_column(String(250))
+    indexing_report: Mapped[dict | None] = mapped_column(JSON, deferred=True)
     semester: Mapped["Semester"] = relationship(back_populates="courses")
     weeks: Mapped[list["Week"]] = relationship(back_populates="course")

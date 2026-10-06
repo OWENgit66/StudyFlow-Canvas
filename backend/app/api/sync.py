@@ -14,6 +14,7 @@ from app.services.document_service import DocumentService
 from app.services.knowledge_service import KnowledgeService
 from app.services.ai_service import AIService
 from app.services.llm_factory import create_llm_provider
+from app.services.course_index import index_course
 
 router = APIRouter(prefix='/api', tags=['sync'])
 DB = Annotated[Session, Depends(get_db)]
@@ -23,7 +24,8 @@ def get_sync_service():
     settings = Settings()
     documents = DocumentService(settings)
     return SyncService(settings, lambda: CanvasService(settings), documents,
-                       KnowledgeService(documents), lambda: AIService(create_llm_provider(settings), settings))
+                       KnowledgeService(documents), lambda: AIService(create_llm_provider(settings), settings),
+                       indexer=index_course)
 
 
 @router.post('/sync', response_model=SyncRecordRead)
